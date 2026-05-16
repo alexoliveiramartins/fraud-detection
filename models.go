@@ -5,12 +5,12 @@ import "time"
 // ----------- payload
 
 type Payload struct {
-	ID              string          `json:"id"`
-	Transaction     string          `json:"transaction"`
-	Customer        Customer        `json:"customer"`
-	Merchant        Merchant        `json:"merchant"`
-	Terminal        Terminal        `json:"terminal"`
-	LastTransaction LastTransaction `json:"last_transaction"`
+	ID              string           `json:"id"`
+	Transaction     Transaction      `json:"transaction"`
+	Customer        Customer         `json:"customer"`
+	Merchant        Merchant         `json:"merchant"`
+	Terminal        Terminal         `json:"terminal"`
+	LastTransaction *LastTransaction `json:"last_transaction"`
 }
 
 type Transaction struct {
