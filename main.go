@@ -13,14 +13,6 @@ func limit(n float32) float32 {
 	return lim
 }
 
-// maxAmount := 10000
-// maxInstallments := 12
-// amountAvgRatio := 10
-// maxMinutes := 1440
-// maxKm := 1000
-// maxTxCount24h := 20
-// maxMerchantAvgAmount := 10000
-
 func makeVector(p Payload) [14]float32 {
 	var vec [14]float32
 
@@ -107,8 +99,6 @@ var mccRisk map[string]float32
 var normalization map[string]float32
 
 func main() {
-	fmt.Println("Hello World")
-
 	err := loadMccRisk()
 	if err != nil {
 		fmt.Println(err)

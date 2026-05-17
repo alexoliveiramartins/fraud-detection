@@ -1,0 +1,12 @@
+.git
+.github
+
+docs
+README.md
+LICENSE
+info.json
+
+docker-compose.yml
+nginx.conf
+
+*.log
