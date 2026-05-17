@@ -1,6 +1,7 @@
 .git
 .github
 
+test
 docs
 README.md
 LICENSE
@@ -10,3 +11,6 @@ docker-compose.yml
 nginx.conf
 
 *.log
+
+resources/references.json
+

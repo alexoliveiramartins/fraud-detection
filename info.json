@@ -1,6 +1,6 @@
 {
   "participants": ["Alex Benjamim de Oliveira Martins"],
-  "social": ["https://github.com/alexoliveiramartins"],
+  "social": ["https://github.com/alexoliveiramartins", "https://www.linkedin.com/in/alexoliveiramartins"],
   "source-code-repo": "https://github.com/alexoliveiramartins/fraud-detection",
   "stack": ["go", "nginx"],
   "open_to_work": true

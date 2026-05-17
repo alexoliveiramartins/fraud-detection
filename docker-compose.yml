@@ -1,6 +1,6 @@
 services:
   api1:
-    image: ghcr.io/alexoliveiramartins/fraud-detection:latest
+    build: .
     hostname: api1
     platform: linux/amd64
     networks:
@@ -9,10 +9,10 @@ services:
       resources:
         limits:
           cpus: "0.45"
-          memory: "150MB"
+          memory: "1g"
 
   api2:
-    image: ghcr.io/alexoliveiramartins/fraud-detection:latest
+    build: .
     hostname: api2
     platform: linux/amd64
     networks:
@@ -21,7 +21,7 @@ services:
       resources:
         limits:
           cpus: "0.45"
-          memory: "150MB"
+          memory: "1g"
 
   nginx:
     image: nginx:1.27-alpine

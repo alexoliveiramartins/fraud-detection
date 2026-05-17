@@ -2,6 +2,18 @@ package main
 
 import "time"
 
+// ----------- references
+
+type Reference struct {
+	Vector [14]float32 `json:"vector"`
+	Label  string      `json:"label"`
+}
+
+type Neighbour struct {
+	Index int
+	Dist  float32
+}
+
 // ----------- payload
 
 type Payload struct {

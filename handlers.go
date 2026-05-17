@@ -17,7 +17,10 @@ func fraudScoreHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		vec := makeVector(body)
-		err = json.NewEncoder(w).Encode(vec)
+		// fmt.Println(vec)
+		knn := knn(vec)
+		resp := MakeResponse(knn)
+		err = json.NewEncoder(w).Encode(resp)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
