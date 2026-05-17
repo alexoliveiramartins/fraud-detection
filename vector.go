@@ -9,7 +9,7 @@ func MakeResponse(neighbours []Neighbour) Response {
 	var score float32
 	for i := range len(neighbours) {
 		idx := neighbours[i].Index
-		if references[idx].Label == "fraud" {
+		if references[idx].Label == true {
 			score += 1
 		}
 	}

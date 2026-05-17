@@ -1,35 +1,47 @@
 package main
 
 import (
-	"compress/gzip"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 )
 
 func loadReferences() error {
-	file, err := os.Open("resources/references.json.gz")
+	file, err := os.Open("resources/references.bin")
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	gz, err := gzip.NewReader(file)
-	if err != nil {
-		return err
-	}
-	defer gz.Close()
-
 	var fileReferences []Reference
 
-	err = json.NewDecoder(gz).Decode(&fileReferences)
-	if err != nil {
-		return err
-	}
+	for {
+		var ref Reference
 
-	references = fileReferences
-	return nil
+		for i := range 14 {
+			err := binary.Read(file, binary.LittleEndian, &ref.Vector[i])
+			if err != nil {
+				if err == io.EOF {
+					references = fileReferences
+					return nil
+				}
+				return err
+			}
+		}
+
+		var label [1]byte
+		_, err := file.Read(label[:])
+		if err != nil {
+			return err
+		}
+
+		ref.Label = label[0] == 1
+
+		fileReferences = append(fileReferences, ref)
+	}
 }
 
 func loadMccRisk() error {

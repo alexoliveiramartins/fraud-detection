@@ -6,7 +6,7 @@ import "time"
 
 type Reference struct {
 	Vector [14]float32 `json:"vector"`
-	Label  string      `json:"label"`
+	Label  bool        `json:"label"` // true se fraude
 }
 
 type Neighbour struct {

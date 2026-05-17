@@ -13,4 +13,5 @@ nginx.conf
 *.log
 
 resources/references.json
-
+resources/references.bin
+# resources/references.json.gz
