@@ -14,6 +14,11 @@ type RawReference struct {
 }
 
 func main() {
+	if _, err := os.Stat("resources/references.bin"); err == nil {
+		fmt.Println("resources/references.bin already exists, skipping preprocess")
+		return
+	}
+
 	input, err := os.Open("resources/references.json.gz")
 	if err != nil {
 		panic(err)

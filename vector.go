@@ -2,7 +2,6 @@ package main
 
 import (
 	"slices"
-	"sort"
 )
 
 func MakeResponse(neighbours []Neighbour) Response {
@@ -36,21 +35,37 @@ func distEuclid(vec1 [14]float32, vec2 [14]float32) float32 {
 }
 
 func knn(vec [14]float32) []Neighbour {
-	neighbours := make([]Neighbour, len(references))
+	knn := make([]Neighbour, 5)
 
-	for i := range references {
-		neighbours[i] = Neighbour{
+	worst := 0
+	for i := range 5 {
+		knn[i] = Neighbour{
 			Index: i,
 			Dist:  distEuclid(vec, references[i].Vector),
 		}
+		if knn[i].Dist > knn[worst].Dist {
+			worst = i
+		}
 	}
 
-	sort.Slice(neighbours, func(i, j int) bool {
-		return neighbours[i].Dist < neighbours[j].Dist
-	})
+	for i := 5; i < len(references); i++ {
+		neighbour := Neighbour{
+			Index: i,
+			Dist:  distEuclid(vec, references[i].Vector),
+		}
+		if neighbour.Dist < knn[worst].Dist {
+			knn[worst] = neighbour
 
-	ans := neighbours[:5]
-	return ans
+			worst = 0
+			for j := range 5 {
+				if knn[j].Dist > knn[worst].Dist {
+					worst = j
+				}
+			}
+		}
+	}
+
+	return knn
 }
 
 func limit(n float32) float32 {

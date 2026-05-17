@@ -3,9 +3,13 @@ FROM golang:1.25-alpine AS builder
 WORKDIR /app
 
 COPY go.mod ./
-COPY . .
+
+COPY resources/references.json.gz ./resources/references.json.gz
+COPY tools/preprocess.go ./tools/preprocess.go
 
 RUN go run ./tools/preprocess.go
+
+COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o fraud-detection .
 
