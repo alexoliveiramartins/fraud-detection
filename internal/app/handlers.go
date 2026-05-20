@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"encoding/json"
@@ -8,7 +8,9 @@ import (
 	vs "github.com/alexoliveiramartins/fraud-detection/internal/vectorsearch"
 )
 
-func fraudScoreHandler(w http.ResponseWriter, r *http.Request) {
+var topK int = 5
+
+func (a *App) FraudScoreHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	switch r.Method {
 	case http.MethodPost:
@@ -18,9 +20,9 @@ func fraudScoreHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		vec := makeVector(body)
+		vec := a.MakeVector(body)
 		// knn := knn(vec)
-		ivf, err := ivfIndexes.IvfSearch(vec, topK, 1)
+		ivf, err := a.IVF.IvfSearch(vec, topK, 1)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -36,7 +38,7 @@ func fraudScoreHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func readyHandler(w http.ResponseWriter, r *http.Request) {
+func (a *App) ReadyHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	switch r.Method {
 	case http.MethodGet:

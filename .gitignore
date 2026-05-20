@@ -31,7 +31,8 @@ go.work.sum
 # .idea/
 # .vscode/
 
-docs
+docs/*
+!docs/SCORES.md
 resources/references.bin
 test/*
 *.bin
