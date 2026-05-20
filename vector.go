@@ -2,13 +2,19 @@ package main
 
 import (
 	"slices"
+
+	vs "github.com/alexoliveiramartins/fraud-detection/internal/vectorsearch"
 )
 
-func MakeResponse(neighbours []Neighbour) Response {
+type Neighbour struct {
+	Index int
+	Dist  float32
+}
+
+func MakeResponse(neighbours []vs.Neighbor) vs.Response {
 	var score float32
 	for i := range len(neighbours) {
-		idx := neighbours[i].Index
-		if references[idx].Label == true {
+		if neighbours[i].Label == true {
 			score += 1
 		}
 	}
@@ -19,13 +25,13 @@ func MakeResponse(neighbours []Neighbour) Response {
 		appr = true
 	}
 
-	return Response{
+	return vs.Response{
 		Approved:   appr,
 		FraudScore: score,
 	}
 }
 
-func distEuclid(vec1 [14]float32, vec2 [14]float32) float32 {
+func distEuclid(vec1 vs.Vector, vec2 vs.Vector) float32 {
 	var sum float32
 	for i := range 14 {
 		diff := vec1[i] - vec2[i]
@@ -34,7 +40,7 @@ func distEuclid(vec1 [14]float32, vec2 [14]float32) float32 {
 	return sum
 }
 
-func knn(vec [14]float32) []Neighbour {
+func knn(vec vs.Vector) []Neighbour {
 	knn := make([]Neighbour, 5)
 
 	worst := 0
@@ -64,7 +70,6 @@ func knn(vec [14]float32) []Neighbour {
 			}
 		}
 	}
-
 	return knn
 }
 
@@ -74,8 +79,8 @@ func limit(n float32) float32 {
 	return lim
 }
 
-func makeVector(p Payload) [14]float32 {
-	var vec [14]float32
+func makeVector(p vs.Payload) vs.Vector {
+	var vec vs.Vector
 
 	vec[0] = limit(p.Transaction.Amount / normalization["max_amount"])
 	vec[1] = limit(float32(p.Transaction.Installments) / normalization["max_installments"])

@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+
+	vs "github.com/alexoliveiramartins/fraud-detection/internal/vectorsearch"
 )
 
 func loadReferences() error {
@@ -16,10 +18,10 @@ func loadReferences() error {
 	}
 	defer file.Close()
 
-	var fileReferences []Reference
+	var fileReferences []vs.Reference
 
 	for {
-		var ref Reference
+		var ref vs.Reference
 
 		for i := range 14 {
 			err := binary.Read(file, binary.LittleEndian, &ref.Vector[i])
@@ -42,6 +44,33 @@ func loadReferences() error {
 
 		fileReferences = append(fileReferences, ref)
 	}
+}
+
+func loadCentroids() error {
+	file, err := os.Open("resources/ivf/centroids.bin")
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	var count uint32
+	if err := binary.Read(file, binary.LittleEndian, &count); err != nil {
+		return err
+	}
+
+	centroids := make([]vs.Vector, count)
+
+	for i := range centroids {
+		for j := range 14 {
+			if err := binary.Read(file, binary.LittleEndian, &centroids[i][j]); err != nil {
+				return err
+			}
+		}
+	}
+
+	ivfIndexes.Centroids = centroids
+
+	return nil
 }
 
 func loadMccRisk() error {
@@ -80,26 +109,76 @@ func loadNormalization() error {
 	return nil
 }
 
+func loadOffsets() error {
+	file, err := os.Open("resources/ivf/offsets.bin")
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	var count uint32
+	if err := binary.Read(file, binary.LittleEndian, &count); err != nil {
+		return err
+	}
+
+	offsets := make([]vs.ClusterOffset, count)
+
+	for i := range offsets {
+		if err := binary.Read(file, binary.LittleEndian, &offsets[i].Offset); err != nil {
+			return err
+		}
+		if err := binary.Read(file, binary.LittleEndian, &offsets[i].Count); err != nil {
+			return err
+		}
+	}
+
+	ivfIndexes.Offsets = offsets
+	ivfIndexes.VectorsPath = "resources/ivf/vectors.bin"
+
+	return nil
+}
+
 var mccRisk map[string]float32
 var normalization map[string]float32
-var references []Reference
+var references []vs.Reference
+
+var ivfIndexes vs.IVFFile
+
+var topK int = 5
 
 func main() {
+	fmt.Printf("Carregando mcc_risk.json...\n")
 	err := loadMccRisk()
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
+	fmt.Printf("Carregando normalization.json...\n")
 	err = loadNormalization()
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	err = loadReferences()
+	// fmt.Printf("Carregando references.bin...\n")
+	// err = loadReferences()
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	return
+	// }
+
+	err = loadCentroids()
 	if err != nil {
-		fmt.Println(err)
-		return
+		panic(err)
 	}
+
+	err = loadOffsets()
+	if err != nil {
+		panic(err)
+	}
+
+	// fmt.Printf("Treinando centroides do indice IVF... ")
+	// ivfIndexes.Build(references, 512)
+	// fmt.Printf("Concluído!\n")
 
 	http.HandleFunc("/ready", readyHandler)
 	http.HandleFunc("/fraud-score", fraudScoreHandler)

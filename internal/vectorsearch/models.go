@@ -1,17 +1,17 @@
-package main
+package vectorsearch
 
 import "time"
 
 // ----------- references
 
 type Reference struct {
-	Vector [14]float32 `json:"vector"`
-	Label  bool        `json:"label"` // true se fraude
+	Vector Vector `json:"vector"`
+	Label  bool   `json:"label"` // true se fraude
 }
 
-type Neighbour struct {
-	Index int
-	Dist  float32
+type RawReference struct {
+	Vector Vector `json:"vector"`
+	Label  string `json:"label"`
 }
 
 // ----------- payload
@@ -59,4 +59,29 @@ type LastTransaction struct {
 type Response struct {
 	Approved   bool    `json:"approved"`
 	FraudScore float32 `json:"fraud_score"`
+}
+
+// ---------- IVF Search
+
+type Vector [14]float32
+
+type Neighbor struct {
+	Dist  float32
+	Label bool // true se fraude
+}
+
+type IVF struct {
+	Centroids []Vector
+	Lists     [][]Reference
+}
+
+type IVFFile struct {
+	Centroids   []Vector
+	Offsets     []ClusterOffset
+	VectorsPath string
+}
+
+type ClusterOffset struct {
+	Offset uint64
+	Count  uint32
 }

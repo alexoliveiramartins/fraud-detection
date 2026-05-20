@@ -34,3 +34,4 @@ go.work.sum
 docs
 resources/references.bin
 test/*
+*.bin

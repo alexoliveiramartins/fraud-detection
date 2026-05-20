@@ -6,6 +6,7 @@ COPY go.mod ./
 
 COPY resources/references.json.gz ./resources/references.json.gz
 COPY tools/preprocess.go ./tools/preprocess.go
+COPY internal/vectorsearch ./internal/vectorsearch
 
 RUN go run ./tools/preprocess.go
 
@@ -18,7 +19,7 @@ FROM scratch
 WORKDIR /app
 
 COPY --from=builder /app/fraud-detection .
-COPY --from=builder /app/resources/references.bin ./resources/references.bin
+COPY --from=builder /app/resources/ivf ./resources/ivf
 COPY --from=builder /app/resources/mcc_risk.json ./resources/mcc_risk.json
 COPY --from=builder /app/resources/normalization.json ./resources/normalization.json
 
