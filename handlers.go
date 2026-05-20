@@ -20,7 +20,7 @@ func fraudScoreHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		vec := makeVector(body)
 		// knn := knn(vec)
-		ivf, err := ivfIndexes.IvfSearch(vec, topK, 3)
+		ivf, err := ivfIndexes.IvfSearch(vec, topK, 1)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
