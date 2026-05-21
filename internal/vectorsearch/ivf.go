@@ -2,12 +2,16 @@ package vectorsearch
 
 import (
 	"encoding/binary"
-	"os"
+	"math"
 	"sort"
 )
 
-const Float32ReferenceSize = 57
-const Uint16ReferenceSize = 29
+// const Float32ReferenceSize = 57
+const Int16ReferenceSize = 29
+
+const QuantScale = 10000
+
+type QuantizedVector [14]int16
 
 func (ivf *IVF) Build(items []Reference, nCentroids int) {
 	ivf.Centroids = TrainCentroids(items, nCentroids)
@@ -19,32 +23,6 @@ func (ivf *IVF) Build(items []Reference, nCentroids int) {
 		centroid := ivf.ClosestCentroid(item.Vector)
 		ivf.Lists[centroid] = append(ivf.Lists[centroid], item)
 	}
-}
-
-// acha o centroide mais perto e busca apenas nos vetores daquele centroide
-func (ivf *IVF) IvfSearch(query Vector, k int, nProbe int) []Neighbor {
-	centroidIDs := ivf.ClosestCentroids(query, nProbe)
-
-	var candidates []Neighbor
-
-	for _, centroidID := range centroidIDs {
-		for _, reference := range ivf.Lists[centroidID] {
-			candidates = append(candidates, Neighbor{
-				Dist:  Dist(query, reference.Vector),
-				Label: reference.Label,
-			})
-		}
-	}
-
-	sort.Slice(candidates, func(i, j int) bool {
-		return candidates[i].Dist < candidates[j].Dist
-	})
-
-	if k > len(candidates) {
-		k = len(candidates)
-	}
-
-	return candidates[:k]
 }
 
 func (ivf *IVF) ClosestCentroids(query Vector, nProbe int) []int {
@@ -172,40 +150,27 @@ func (ivf *IVFFile) ClosestCentroids(query Vector, nProbe int) []int {
 }
 
 func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) ([]Neighbor, error) {
+	queryQ := QuantizeVector(query)
+
 	// encontra os centroids proximos
 	centroidIDs := ivf.ClosestCentroids(query, nProbe)
-
-	file, err := os.Open(ivf.VectorsPath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
 
 	top := make([]Neighbor, 0, k)
 
 	for _, centroidID := range centroidIDs {
 		cluster := ivf.Offsets[centroidID]
-		size := int(cluster.Count) * Uint16ReferenceSize
+		size := int(cluster.Count) * Int16ReferenceSize
 		buf := make([]byte, size)
 
-		if _, err := file.ReadAt(buf, int64(cluster.Offset)); err != nil {
+		if _, err := ivf.VectorsFile.ReadAt(buf, int64(cluster.Offset)); err != nil {
 			return nil, err
 		}
 
 		for i := 0; i < int(cluster.Count); i++ {
-			base := i * Uint16ReferenceSize
-			var ref Vector
-
-			for dim := 0; dim < 14; dim++ {
-				pos := base + dim*2
-				q := binary.LittleEndian.Uint16(buf[pos : pos+2])
-				ref[dim] = dequantize(q)
-				// bits := binary.LittleEndian.Uint32(buf[pos : pos+4])
-				// ref[dim] = math.Float32frombits(bits)
-			}
+			base := i * Int16ReferenceSize
 
 			neighbor := Neighbor{
-				Dist:  Dist(query, ref),
+				Dist:  DistQuantizedFromBuffer(queryQ, buf, base),
 				Label: buf[base+28] == 1,
 			}
 
@@ -234,20 +199,35 @@ func insertTopK(top *[]Neighbor, candidate Neighbor, k int) {
 	}
 }
 
-// funcao de quantizacao de float32 -> uint16
-func Quantize(v float32) uint16 {
-	if v < 0 {
-		return 0
+// transforma float32 -> int16 em [-1, 1]
+func EncodeFloat(v float32) int16 {
+	if v < -1 {
+		v = -1
 	}
 	if v > 1 {
 		v = 1
 	}
-	return uint16(1 + v*65534)
+	return int16(math.Round(float64(v * QuantScale)))
 }
 
-func dequantize(v uint16) float32 {
-	if v == 0 {
-		return -1
+func QuantizeVector(vec Vector) QuantizedVector {
+	var q QuantizedVector
+
+	for i := range 14 {
+		q[i] = EncodeFloat(vec[i])
 	}
-	return float32(v-1) / 65534
+
+	return q
+}
+
+func DistQuantizedFromBuffer(query QuantizedVector, buf []byte, base int) int64 {
+	var sum int64
+	for dim := 0; dim < 14; dim++ {
+		pos := base + dim*2
+		refValue := int16(binary.LittleEndian.Uint16(buf[pos : pos+2]))
+
+		diff := int64(query[dim]) - int64(refValue)
+		sum += diff * diff
+	}
+	return sum
 }

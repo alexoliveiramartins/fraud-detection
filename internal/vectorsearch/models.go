@@ -1,6 +1,9 @@
 package vectorsearch
 
-import "time"
+import (
+	"os"
+	"time"
+)
 
 // ----------- references
 
@@ -66,7 +69,7 @@ type Response struct {
 type Vector [14]float32
 
 type Neighbor struct {
-	Dist  float32
+	Dist  int64
 	Label bool // true se fraude
 }
 
@@ -78,7 +81,7 @@ type IVF struct {
 type IVFFile struct {
 	Centroids   []Vector
 	Offsets     []ClusterOffset
-	VectorsPath string
+	VectorsFile  *os.File
 }
 
 type ClusterOffset struct {

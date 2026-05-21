@@ -111,7 +111,7 @@ func writeClusters(vectorsPath, offsetsPath string, clusters [][]Reference) {
 
 	var currentOffset uint64 = 0
 	// const refSize uint64 = 57 // float32 + 1byte
-	const refSize uint64 = 29 // uint16 + 1byte
+	const refSize uint64 = 29 // 14 int16 + 1 byte label
 
 	for _, cluster := range clusters { // para cada cluster
 		// escreve o tamanho do cluster (individual) e o offset atual no arquivo de offsets.bin
@@ -127,8 +127,8 @@ func writeClusters(vectorsPath, offsetsPath string, clusters [][]Reference) {
 		for _, ref := range cluster {
 			// escreve as dimensoes do vetor (ref) no arquivo vectors.bin
 			for _, value := range ref.Vector {
-				// quantiza o vetor de float32 -> uint16 (metade do tamanho)
-				q := Quantize(value)
+				// quantiza o vetor de float32 -> int16 (metade do tamanho)
+				q := EncodeFloat(value)
 				if err := binary.Write(vectorsFile, binary.LittleEndian, q); err != nil {
 					panic(err)
 				}

@@ -101,7 +101,12 @@ func (a *App) LoadOffsets() error {
 	}
 
 	a.IVF.Offsets = offsets
-	a.IVF.VectorsPath = "resources/ivf/vectors.bin"
+	vectorsFile, err := os.Open("resources/ivf/vectors.bin")
+	if err != nil {
+		return err
+	}
+
+	a.IVF.VectorsFile = vectorsFile
 
 	return nil
 }
