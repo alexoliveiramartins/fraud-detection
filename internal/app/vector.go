@@ -59,7 +59,8 @@ func (a *App) MakeVector(p vs.Payload) vs.Vector {
 		vec[5] = -1
 		vec[6] = -1
 	} else {
-		vec[5] = limit(float32(p.LastTransaction.Timestamp.Minute()) / a.Normalization["max_minutes"])
+		minutesSinceLast := p.Transaction.RequestedAt.Sub(p.LastTransaction.Timestamp).Minutes()
+		vec[5] = limit(float32(minutesSinceLast) / a.Normalization["max_minutes"])
 		vec[6] = limit(p.LastTransaction.KmFromCurrent / a.Normalization["max_km"])
 	}
 	vec[7] = limit(p.Terminal.KmFromHome / a.Normalization["max_km"])

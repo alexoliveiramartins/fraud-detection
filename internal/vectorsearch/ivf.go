@@ -144,39 +144,39 @@ func (ivf *IVFFile) ClosestCentroid(query Vector) int {
 }
 
 func (ivf *IVFFile) ClosestCentroids(query Vector, nProbe int) []int {
-	ids := make([]int, len(ivf.Centroids))
+	ids := make([]int, 0, nProbe)
 
-	for i := range ivf.Centroids {
-		ids[i] = i
+	for i := range nProbe {
+		ids = append(ids, i)
 	}
 
-	// ordena o vetor de centroids por distancia ate o vetor da query
-	sort.Slice(ids, func(i, j int) bool {
-		distI := Dist(query, ivf.Centroids[ids[i]])
+	sort.Slice(ids, func(c, j int) bool {
+		distI := Dist(query, ivf.Centroids[ids[c]])
 		distJ := Dist(query, ivf.Centroids[ids[j]])
 
 		return distI < distJ
 	})
 
-	if nProbe > len(ids) {
-		nProbe = len(ids)
-	}
+	for i := nProbe; i < len(ivf.Centroids); i++ {
+		// preenche os n primeiros elementos
+		if Dist(query, ivf.Centroids[i]) < Dist(query, ivf.Centroids[ids[nProbe-1]]) {
+			ids[nProbe-1] = i
+			sort.Slice(ids, func(c, j int) bool {
+				distI := Dist(query, ivf.Centroids[ids[c]])
+				distJ := Dist(query, ivf.Centroids[ids[j]])
 
-	return ids[:nProbe]
+				return distI < distJ
+			})
+		}
+	}
+	return ids
 }
 
 func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) ([]Neighbor, error) {
 	queryQ := QuantizeVector(query)
 
 	// encontra os centroids proximos
-	var centroidIDs []int
-
-	if nProbe == 1 {
-		centroidID := ivf.ClosestCentroid(query)
-		centroidIDs = []int{centroidID}
-	} else {
-		centroidIDs = ivf.ClosestCentroids(query, nProbe)
-	}
+	centroidIDs := ivf.ClosestCentroids(query, nProbe)
 
 	top := make([]Neighbor, 0, k)
 
