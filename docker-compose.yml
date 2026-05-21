@@ -9,7 +9,7 @@ services:
       resources:
         limits:
           cpus: "0.45"
-          memory: "150MB"
+          memory: "160MB"
 
   api2:
     build: .
@@ -21,7 +21,7 @@ services:
       resources:
         limits:
           cpus: "0.45"
-          memory: "150MB"
+          memory: "160MB"
 
   nginx:
     image: nginx:1.27-alpine
@@ -40,7 +40,7 @@ services:
       resources:
         limits:
           cpus: "0.10"
-          memory: "50MB"
+          memory: "30MB"
 
 networks:
   fraud-network:
