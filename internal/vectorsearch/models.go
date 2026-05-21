@@ -1,7 +1,6 @@
 package vectorsearch
 
 import (
-	"os"
 	"time"
 )
 
@@ -81,7 +80,7 @@ type IVF struct {
 type IVFFile struct {
 	Centroids   []Vector
 	Offsets     []ClusterOffset
-	VectorsFile  *os.File
+	VectorsData []byte
 }
 
 type ClusterOffset struct {

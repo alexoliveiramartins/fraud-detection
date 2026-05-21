@@ -101,12 +101,12 @@ func (a *App) LoadOffsets() error {
 	}
 
 	a.IVF.Offsets = offsets
-	vectorsFile, err := os.Open("resources/ivf/vectors.bin")
+	data, err := os.ReadFile("resources/ivf/vectors.bin")
 	if err != nil {
 		return err
 	}
 
-	a.IVF.VectorsFile = vectorsFile
+	a.IVF.VectorsData = data
 
 	return nil
 }

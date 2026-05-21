@@ -159,12 +159,11 @@ func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) ([]Neighbor, erro
 
 	for _, centroidID := range centroidIDs {
 		cluster := ivf.Offsets[centroidID]
-		size := int(cluster.Count) * Int16ReferenceSize
-		buf := make([]byte, size)
 
-		if _, err := ivf.VectorsFile.ReadAt(buf, int64(cluster.Offset)); err != nil {
-			return nil, err
-		}
+		start := int(cluster.Offset)
+		end := start + int(cluster.Count)*Int16ReferenceSize
+
+		buf := ivf.VectorsData[start:end]
 
 		for i := 0; i < int(cluster.Count); i++ {
 			base := i * Int16ReferenceSize
