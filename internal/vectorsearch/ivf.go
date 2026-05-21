@@ -2,12 +2,12 @@ package vectorsearch
 
 import (
 	"encoding/binary"
-	"math"
 	"os"
 	"sort"
 )
 
 const Float32ReferenceSize = 57
+const Uint16ReferenceSize = 29
 
 func (ivf *IVF) Build(items []Reference, nCentroids int) {
 	ivf.Centroids = TrainCentroids(items, nCentroids)
@@ -185,7 +185,7 @@ func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) ([]Neighbor, erro
 
 	for _, centroidID := range centroidIDs {
 		cluster := ivf.Offsets[centroidID]
-		size := int(cluster.Count) * Float32ReferenceSize
+		size := int(cluster.Count) * Uint16ReferenceSize
 		buf := make([]byte, size)
 
 		if _, err := file.ReadAt(buf, int64(cluster.Offset)); err != nil {
@@ -193,18 +193,20 @@ func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) ([]Neighbor, erro
 		}
 
 		for i := 0; i < int(cluster.Count); i++ {
-			base := i * Float32ReferenceSize
+			base := i * Uint16ReferenceSize
 			var ref Vector
 
 			for dim := 0; dim < 14; dim++ {
-				pos := base + dim*4
-				bits := binary.LittleEndian.Uint32(buf[pos : pos+4])
-				ref[dim] = math.Float32frombits(bits)
+				pos := base + dim*2
+				q := binary.LittleEndian.Uint16(buf[pos : pos+2])
+				ref[dim] = dequantize(q)
+				// bits := binary.LittleEndian.Uint32(buf[pos : pos+4])
+				// ref[dim] = math.Float32frombits(bits)
 			}
 
 			neighbor := Neighbor{
 				Dist:  Dist(query, ref),
-				Label: buf[base+56] == 1,
+				Label: buf[base+28] == 1,
 			}
 
 			insertTopK(&top, neighbor, k)
@@ -230,4 +232,22 @@ func insertTopK(top *[]Neighbor, candidate Neighbor, k int) {
 	if candidate.Dist < (*top)[worst].Dist {
 		(*top)[worst] = candidate
 	}
+}
+
+// funcao de quantizacao de float32 -> uint16
+func Quantize(v float32) uint16 {
+	if v < 0 {
+		return 0
+	}
+	if v > 1 {
+		v = 1
+	}
+	return uint16(1 + v*65534)
+}
+
+func dequantize(v uint16) float32 {
+	if v == 0 {
+		return -1
+	}
+	return float32(v-1) / 65534
 }

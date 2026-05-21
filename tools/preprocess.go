@@ -4,7 +4,6 @@ import (
 	"compress/gzip"
 	"encoding/binary"
 	"encoding/json"
-	"fmt"
 	"os"
 
 	. "github.com/alexoliveiramartins/fraud-detection/internal/vectorsearch"
@@ -111,7 +110,8 @@ func writeClusters(vectorsPath, offsetsPath string, clusters [][]Reference) {
 	}
 
 	var currentOffset uint64 = 0
-	const refSize uint64 = 57
+	// const refSize uint64 = 57 // float32 + 1byte
+	const refSize uint64 = 29 // uint16 + 1byte
 
 	for _, cluster := range clusters { // para cada cluster
 		// escreve o tamanho do cluster (individual) e o offset atual no arquivo de offsets.bin
@@ -127,7 +127,9 @@ func writeClusters(vectorsPath, offsetsPath string, clusters [][]Reference) {
 		for _, ref := range cluster {
 			// escreve as dimensoes do vetor (ref) no arquivo vectors.bin
 			for _, value := range ref.Vector {
-				if err := binary.Write(vectorsFile, binary.LittleEndian, value); err != nil {
+				// quantiza o vetor de float32 -> uint16 (metade do tamanho)
+				q := Quantize(value)
+				if err := binary.Write(vectorsFile, binary.LittleEndian, q); err != nil {
 					panic(err)
 				}
 			}
@@ -142,7 +144,7 @@ func writeClusters(vectorsPath, offsetsPath string, clusters [][]Reference) {
 		}
 
 		// incrementa o offset pelo tamanho do cluster * tamanho do dado
-		// (14 * float32(4 bytes) + 1 bit da label) = 57
+		// (14 * refSize + 1 bit da label)
 		currentOffset += uint64(len(cluster)) * refSize
 	}
 }
@@ -158,6 +160,6 @@ func main() {
 	}
 
 	writeCentroids("resources/ivf/centroids.bin", ivfIndex.Centroids)
-	fmt.Printf("wrote %d centroids\n", len(ivfIndex.Centroids))
+	// fmt.Printf("wrote %d centroids\n", len(ivfIndex.Centroids))
 	writeClusters("resources/ivf/vectors.bin", "resources/ivf/offsets.bin", ivfIndex.Lists)
 }
