@@ -127,6 +127,22 @@ func Dist(a, b Vector) float32 {
 
 // especificas do IVF por arquivos .bin com offsets
 
+func (ivf *IVFFile) ClosestCentroid(query Vector) int {
+	bestID := 0
+	bestDist := Dist(query, ivf.Centroids[0])
+
+	for id := 1; id < len(ivf.Centroids); id++ {
+		dist := Dist(query, ivf.Centroids[id])
+
+		if dist < bestDist {
+			bestID = id
+			bestDist = dist
+		}
+	}
+
+	return bestID
+}
+
 func (ivf *IVFFile) ClosestCentroids(query Vector, nProbe int) []int {
 	ids := make([]int, len(ivf.Centroids))
 
@@ -153,7 +169,14 @@ func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) ([]Neighbor, erro
 	queryQ := QuantizeVector(query)
 
 	// encontra os centroids proximos
-	centroidIDs := ivf.ClosestCentroids(query, nProbe)
+	var centroidIDs []int
+
+	if nProbe == 1 {
+		centroidID := ivf.ClosestCentroid(query)
+		centroidIDs = []int{centroidID}
+	} else {
+		centroidIDs = ivf.ClosestCentroids(query, nProbe)
+	}
 
 	top := make([]Neighbor, 0, k)
 
