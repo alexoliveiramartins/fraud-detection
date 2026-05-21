@@ -1,6 +1,6 @@
 services:
   api1:
-    image: ghcr.io/alexoliveiramartins/fraud-detection:latest
+    image: ghcr.io/alexoliveiramartins/fraud-detection:31b87b51cdf83b7d82f44a03c1332e1956350ec6
     hostname: api1
     platform: linux/amd64
     networks:
