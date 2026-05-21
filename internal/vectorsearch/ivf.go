@@ -166,10 +166,12 @@ func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) ([]Neighbor, erro
 		buf := ivf.VectorsData[start:end]
 
 		for i := 0; i < int(cluster.Count); i++ {
+			worst := worstTopKDistance(top, k)
 			base := i * Int16ReferenceSize
+			dist := DistQuantizedFromBuffer(queryQ, buf, base, worst)
 
 			neighbor := Neighbor{
-				Dist:  DistQuantizedFromBuffer(queryQ, buf, base),
+				Dist:  dist,
 				Label: buf[base+28] == 1,
 			}
 
@@ -178,6 +180,37 @@ func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) ([]Neighbor, erro
 	}
 
 	return top, nil
+}
+
+func worstTopKDistance(top []Neighbor, k int) int64 {
+	if len(top) < k {
+		return math.MaxInt64
+	}
+
+	worst := top[0].Dist
+
+	for i := 1; i < len(top); i++ {
+		if top[i].Dist > worst {
+			worst = top[i].Dist
+		}
+	}
+
+	return worst
+}
+
+func DistQuantizedFromBuffer(query QuantizedVector, buf []byte, base int, worstDist int64) int64 {
+	var sum int64
+	for dim := 0; dim < 14; dim++ {
+		pos := base + dim*2
+		refValue := int16(binary.LittleEndian.Uint16(buf[pos : pos+2]))
+
+		diff := int64(query[dim]) - int64(refValue)
+		sum += diff * diff
+		if sum >= worstDist {
+			return sum
+		}
+	}
+	return sum
 }
 
 func insertTopK(top *[]Neighbor, candidate Neighbor, k int) {
@@ -217,16 +250,4 @@ func QuantizeVector(vec Vector) QuantizedVector {
 	}
 
 	return q
-}
-
-func DistQuantizedFromBuffer(query QuantizedVector, buf []byte, base int) int64 {
-	var sum int64
-	for dim := 0; dim < 14; dim++ {
-		pos := base + dim*2
-		refValue := int16(binary.LittleEndian.Uint16(buf[pos : pos+2]))
-
-		diff := int64(query[dim]) - int64(refValue)
-		sum += diff * diff
-	}
-	return sum
 }

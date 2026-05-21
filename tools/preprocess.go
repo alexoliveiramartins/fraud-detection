@@ -11,7 +11,7 @@ import (
 
 var ivfIndex IVF
 
-const nCentroids = 512
+const nCentroids = 1024
 
 func toReferences(rawRefs []RawReference) []Reference {
 	refs := make([]Reference, len(rawRefs))
