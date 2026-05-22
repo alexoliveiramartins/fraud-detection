@@ -1,9 +1,10 @@
 package app
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/bytedance/sonic"
 
 	vs "github.com/alexoliveiramartins/fraud-detection/internal/vectorsearch"
 )
@@ -15,20 +16,24 @@ func (a *App) FraudScoreHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
 		var body vs.Payload
-		err := json.NewDecoder(r.Body).Decode(&body)
+
+		err := sonic.ConfigDefault.NewDecoder(r.Body).Decode(&body)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+
 		vec := a.MakeVector(body)
-		// knn := knn(vec)
+
 		ivf, err := a.IVF.IvfSearch(vec, topK, 1)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
 		resp := MakeResponse(ivf)
-		err = json.NewEncoder(w).Encode(resp)
+
+		err = sonic.ConfigDefault.NewEncoder(w).Encode(resp)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
