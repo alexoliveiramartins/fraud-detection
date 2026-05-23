@@ -11,20 +11,11 @@ type Neighbour struct {
 	Dist  float32
 }
 
-func MakeResponse(neighbours []vs.Neighbor) vs.Response {
-	var score float32
-	for i := range len(neighbours) {
-		if neighbours[i].Label == true {
-			score += 1
-		}
-	}
-	score /= 5
-
+func MakeResponse(score float32) vs.Response {
 	appr := false
 	if score < 0.6 {
 		appr = true
 	}
-
 	return vs.Response{
 		Approved:   appr,
 		FraudScore: score,

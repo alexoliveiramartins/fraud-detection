@@ -7,9 +7,11 @@ import (
 )
 
 // const Float32ReferenceSize = 57
-const Int16ReferenceSize = 29
-
-const QuantScale = 10000
+const (
+	Int16ReferenceSize = 29
+	fixedTopK          = 5
+	QuantScale         = 10000
+)
 
 type QuantizedVector [14]int16
 
@@ -172,53 +174,101 @@ func (ivf *IVFFile) ClosestCentroids(query Vector, nProbe int) []int {
 	return ids
 }
 
-func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) ([]Neighbor, error) {
+func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) (float32, error) {
 	queryQ := QuantizeVector(query)
 
-	// encontra os centroids proximos
-	centroidIDs := ivf.ClosestCentroids(query, nProbe)
+	var top fixedTop
+	ivf.searchIntoTop(&top, query, queryQ, nProbe)
 
-	top := make([]Neighbor, 0, k)
-
-	for _, centroidID := range centroidIDs {
-		cluster := ivf.Offsets[centroidID]
-
-		start := int(cluster.Offset)
-		end := start + int(cluster.Count)*Int16ReferenceSize
-
-		buf := ivf.VectorsData[start:end]
-
-		for i := 0; i < int(cluster.Count); i++ {
-			worst := worstTopKDistance(top, k)
-			base := i * Int16ReferenceSize
-			dist := DistQuantizedFromBuffer(queryQ, buf, base, worst)
-
-			neighbor := Neighbor{
-				Dist:  dist,
-				Label: buf[base+28] == 1,
-			}
-
-			insertTopK(&top, neighbor, k)
+	var score float32
+	for _, label := range top.label {
+		if label == true {
+			score += 1
 		}
 	}
 
-	return top, nil
+	return score / float32(top.size), nil
 }
 
-func worstTopKDistance(top []Neighbor, k int) int64 {
-	if len(top) < k {
-		return math.MaxInt64
+func (ivf *IVFFile) searchIntoTop(top *fixedTop, query Vector, queryQ QuantizedVector, nProbe int) {
+	if nProbe <= 1 {
+		centroidID := ivf.ClosestCentroid(query)
+		ivf.scanCluster(top, queryQ, centroidID)
+		return
 	}
 
-	worst := top[0].Dist
+	centroidIDs := ivf.ClosestCentroids(query, nProbe)
+	for _, centroidID := range centroidIDs {
+		ivf.scanCluster(top, queryQ, centroidID)
+	}
+}
 
-	for i := 1; i < len(top); i++ {
-		if top[i].Dist > worst {
-			worst = top[i].Dist
+func (ivf *IVFFile) scanCluster(top *fixedTop, queryQ QuantizedVector, centroidID int) {
+	cluster := ivf.Offsets[centroidID]
+
+	start := int(cluster.Offset)
+	end := start + int(cluster.Count)*Int16ReferenceSize
+	buf := ivf.VectorsData[start:end]
+
+	for i := 0; i < int(cluster.Count); i++ {
+		base := i * Int16ReferenceSize
+
+		worst := top.worst()
+		dist := DistQuantizedFromBuffer(queryQ, buf, base, worst)
+
+		if dist < worst {
+			top.push(dist, buf[base+28] == 1)
 		}
 	}
+}
 
-	return worst
+func (t *fixedTop) worst() int64 {
+	if t.size < fixedTopK {
+		return math.MaxInt64
+	}
+	return t.dist[t.worstIdx]
+}
+
+// insercao no topK
+func (t *fixedTop) push(dist int64, label bool) {
+	// se o tamanho da array for menor que o topK, adiciona os (topK) primeiros
+	// e incrementa o tamanho da array
+	if t.size < fixedTopK {
+		idx := t.size
+		t.dist[idx] = dist
+		t.label[idx] = label
+
+		if t.size == 0 || dist > t.dist[t.worstIdx] {
+			t.worstIdx = idx
+		}
+		t.size++
+		return
+	}
+
+	// se a distancia for maior do que a pior (maior ditancia no topK),
+	// ignora essa distancia
+	if dist >= t.dist[t.worstIdx] {
+		return
+	}
+
+	// se nao, entao adiciona no topK como pior distancia
+	t.dist[t.worstIdx] = dist
+	t.label[t.worstIdx] = label
+	// depois reordena o topK para caso essa que foi inserida
+	// nao for a pior mesmo, e deixa a pior em worstIdx
+	t.recomputeWorst()
+}
+
+func (t *fixedTop) recomputeWorst() {
+	worst := 0
+	// percorre o topK para encontrar a >real< pior distancia (maior distancia)
+	for i := 1; i < t.size; i++ {
+		if t.dist[i] > t.dist[worst] {
+			worst = i
+		}
+	}
+	// worstIdx guarda a pior distancia
+	t.worstIdx = worst
 }
 
 func DistQuantizedFromBuffer(query QuantizedVector, buf []byte, base int, worstDist int64) int64 {

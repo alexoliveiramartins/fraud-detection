@@ -1,6 +1,7 @@
 package vectorsearch
 
 import (
+	"os"
 	"time"
 )
 
@@ -81,9 +82,17 @@ type IVFFile struct {
 	Centroids   []Vector
 	Offsets     []ClusterOffset
 	VectorsData []byte
+	VectorsFile *os.File
 }
 
 type ClusterOffset struct {
 	Offset uint64
 	Count  uint32
+}
+
+type fixedTop struct {
+	dist     [fixedTopK]int64
+	label    [fixedTopK]bool
+	size     int
+	worstIdx int
 }

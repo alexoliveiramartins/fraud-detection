@@ -10,15 +10,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bytedance/sonic"
+
 	vs "github.com/alexoliveiramartins/fraud-detection/internal/vectorsearch"
 )
 
 var (
-	benchmarkNeighbors []vs.Neighbor
-	benchmarkIDs       []int
-	benchmarkID        int
-	benchmarkResponse  vs.Response
-	benchmarkStatus    int
+	benchmarkScore    float32
+	benchmarkIDs      []int
+	benchmarkID       int
+	benchmarkPayload  vs.Payload
+	benchmarkResponse vs.Response
+	benchmarkStatus   int
 )
 
 func loadBenchmarkApp(b *testing.B) *App {
@@ -189,11 +192,11 @@ func BenchmarkIVFSearchMixedClusters(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		neighbors, err := a.IVF.IvfSearch(queries[i%len(queries)], 5, 1)
+		score, err := a.IVF.IvfSearch(queries[i%len(queries)], 5, 1)
 		if err != nil {
 			b.Fatal(err)
 		}
-		benchmarkNeighbors = neighbors
+		benchmarkScore = score
 	}
 }
 
@@ -206,11 +209,11 @@ func BenchmarkIVFSearchSmallestCluster(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		neighbors, err := a.IVF.IvfSearch(query, 5, 1)
+		score, err := a.IVF.IvfSearch(query, 5, 1)
 		if err != nil {
 			b.Fatal(err)
 		}
-		benchmarkNeighbors = neighbors
+		benchmarkScore = score
 	}
 }
 
@@ -223,11 +226,11 @@ func BenchmarkIVFSearchLargestCluster(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		neighbors, err := a.IVF.IvfSearch(query, 5, 1)
+		score, err := a.IVF.IvfSearch(query, 5, 1)
 		if err != nil {
 			b.Fatal(err)
 		}
-		benchmarkNeighbors = neighbors
+		benchmarkScore = score
 	}
 }
 
@@ -242,12 +245,12 @@ func BenchmarkFraudSearch(b *testing.B) {
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {
-				neighbors, err := a.IVF.IvfSearch(vec, topK, 1)
+				score, err := a.IVF.IvfSearch(vec, topK, 1)
 				if err != nil {
 					b.Fatal(err)
 				}
 
-				benchmarkNeighbors = neighbors
+				benchmarkScore = score
 			}
 		})
 	}
@@ -263,14 +266,86 @@ func BenchmarkFraudPipeline(b *testing.B) {
 
 			for i := 0; i < b.N; i++ {
 				vec := a.MakeVector(payload.body)
-				neighbors, err := a.IVF.IvfSearch(vec, topK, 1)
+				score, err := a.IVF.IvfSearch(vec, topK, 1)
 				if err != nil {
 					b.Fatal(err)
 				}
 
-				benchmarkResponse = MakeResponse(neighbors)
+				benchmarkResponse = MakeResponse(score)
 			}
 		})
+	}
+}
+
+func BenchmarkSonicDecode(b *testing.B) {
+	for _, payload := range benchmarkPayloads() {
+		b.Run(payload.name, func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+
+			for i := 0; i < b.N; i++ {
+				var body vs.Payload
+				if err := sonic.ConfigDefault.NewDecoder(bytes.NewReader(payload.json)).Decode(&body); err != nil {
+					b.Fatal(err)
+				}
+				benchmarkPayload = body
+			}
+		})
+	}
+}
+
+func BenchmarkMakeVector(b *testing.B) {
+	a := loadBenchmarkApp(b)
+
+	for _, payload := range benchmarkPayloads() {
+		b.Run(payload.name, func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+
+			for i := 0; i < b.N; i++ {
+				benchmarkScore = a.MakeVector(payload.body)[0]
+			}
+		})
+	}
+}
+
+func BenchmarkMakeResponse(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		benchmarkResponse = MakeResponse(0.4)
+	}
+}
+
+func BenchmarkSonicEncode(b *testing.B) {
+	resp := vs.Response{
+		Approved:   true,
+		FraudScore: 0.4,
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		var buf bytes.Buffer
+		if err := sonic.ConfigDefault.NewEncoder(&buf).Encode(resp); err != nil {
+			b.Fatal(err)
+		}
+		benchmarkStatus = buf.Len()
+	}
+}
+
+func BenchmarkHTTPTestHarness(b *testing.B) {
+	payload := benchmarkPayloads()[0]
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/fraud-score", bytes.NewReader(payload.json))
+		req.Header.Set("Content-Type", "application/json")
+		res := httptest.NewRecorder()
+
+		benchmarkStatus = res.Code + len(req.Header)
 	}
 }
 

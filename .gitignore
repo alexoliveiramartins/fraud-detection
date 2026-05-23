@@ -36,3 +36,4 @@ docs/*
 resources/references.bin
 test/*
 *.bin
+Makefile

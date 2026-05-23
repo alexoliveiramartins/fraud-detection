@@ -6,6 +6,7 @@ import (
 	"os"
 
 	vs "github.com/alexoliveiramartins/fraud-detection/internal/vectorsearch"
+	"golang.org/x/sys/unix"
 )
 
 type App struct {
@@ -99,14 +100,25 @@ func (a *App) LoadOffsets() error {
 			return err
 		}
 	}
-
 	a.IVF.Offsets = offsets
-	data, err := os.ReadFile("resources/ivf/vectors.bin")
+
+	file, err = os.Open("resources/ivf/vectors.bin")
 	if err != nil {
 		return err
 	}
-
+	info, err := file.Stat()
+	if err != nil {
+		file.Close()
+		return err
+	}
+	size := info.Size()
+	data, err := unix.Mmap(int(file.Fd()), 0, int(size), unix.PROT_READ, unix.MAP_SHARED)
+	if err != nil {
+		file.Close()
+		return err
+	}
 	a.IVF.VectorsData = data
+	a.IVF.VectorsFile = file
 
 	return nil
 }
