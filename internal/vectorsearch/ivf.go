@@ -3,6 +3,7 @@ package vectorsearch
 import (
 	"encoding/binary"
 	"math"
+	"math/rand"
 	"sort"
 )
 
@@ -65,9 +66,12 @@ func (ivf *IVF) ClosestCentroid(vec Vector) int {
 func TrainCentroids(items []Reference, nCentroids int) []Vector {
 	centroids := make([]Vector, nCentroids)
 
-	// inicializa os centroids apenas com os 'i' primeiros vetores
+	// inicializa os centroids com os n primeiros vetores aleatorios (seed fixa)
+	rng := rand.New(rand.NewSource(42))
+	perm := rng.Perm(len(items))
+
 	for i := 0; i < nCentroids; i++ {
-		centroids[i] = items[i].Vector
+		centroids[i] = items[perm[i]].Vector
 	}
 
 	maxIterations := 20

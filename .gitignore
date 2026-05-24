@@ -37,3 +37,5 @@ resources/references.bin
 test/*
 *.bin
 Makefile
+bench.sh
+out.txt

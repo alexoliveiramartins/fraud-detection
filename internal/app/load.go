@@ -9,9 +9,19 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+type Normalization struct {
+	MaxAmount       float32
+	MaxInstallments float32
+	AmountVsAvg     float32
+	MaxMinutes      float32
+	MaxKm           float32
+	MaxTxCount      float32
+	MaxMerchantAvg  float32
+}
+
 type App struct {
 	MccRisk       map[string]float32
-	Normalization map[string]float32
+	Normalization Normalization
 	IVF           vs.IVFFile
 }
 
@@ -67,14 +77,22 @@ func (a *App) LoadNormalization() error {
 	}
 	defer file.Close()
 
-	var norm map[string]float32
-
-	err = json.NewDecoder(file).Decode(&norm)
+	var data map[string]float32
+	err = json.NewDecoder(file).Decode(&data)
 	if err != nil {
 		return err
 	}
 
-	a.Normalization = norm
+	a.Normalization = Normalization{
+		MaxAmount:       data["max_amount"],
+		MaxInstallments: data["max_installments"],
+		AmountVsAvg:     data["amount_vs_avg_ratio"],
+		MaxMinutes:      data["max_minutes"],
+		MaxKm:           data["max_km"],
+		MaxTxCount:      data["max_tx_count_24h"],
+		MaxMerchantAvg:  data["max_merchant_avg_amount"],
+	}
+
 	return nil
 }
 

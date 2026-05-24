@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -22,6 +23,7 @@ var (
 	benchmarkPayload  vs.Payload
 	benchmarkResponse vs.Response
 	benchmarkStatus   int
+	benchmarkBody     []byte
 )
 
 func loadBenchmarkApp(b *testing.B) *App {
@@ -184,12 +186,52 @@ func benchmarkQueries(b *testing.B, ivf vs.IVFFile) []vs.Vector {
 	}
 }
 
+func benchmarkRefsScanned(b *testing.B, ivf vs.IVFFile, query vs.Vector, nProbe int) int {
+	b.Helper()
+
+	if nProbe <= 1 {
+		centroidID := ivf.ClosestCentroid(query)
+		return int(ivf.Offsets[centroidID].Count)
+	}
+
+	refs := 0
+	for _, centroidID := range ivf.ClosestCentroids(query, nProbe) {
+		refs += int(ivf.Offsets[centroidID].Count)
+	}
+	return refs
+}
+
+func benchmarkAvgRefsScanned(b *testing.B, ivf vs.IVFFile, queries []vs.Vector, nProbe int) float64 {
+	b.Helper()
+
+	total := 0
+	for _, query := range queries {
+		total += benchmarkRefsScanned(b, ivf, query, nProbe)
+	}
+	return float64(total) / float64(len(queries))
+}
+
+func reportSearchMetrics(b *testing.B, ivf vs.IVFFile, query vs.Vector, nProbe int) {
+	b.Helper()
+	b.ReportMetric(float64(nProbe), "nprobe")
+	b.ReportMetric(float64(len(ivf.Centroids)), "centroids")
+	b.ReportMetric(float64(benchmarkRefsScanned(b, ivf, query, nProbe)), "refs/op")
+}
+
+func reportPayloadMetrics(b *testing.B, payload benchmarkPayloadFixture) {
+	b.Helper()
+	b.ReportMetric(float64(len(payload.json)), "payload_B/op")
+}
+
 func BenchmarkIVFSearchMixedClusters(b *testing.B) {
 	a := loadBenchmarkApp(b)
 	queries := benchmarkQueries(b, a.IVF)
 
 	b.ReportAllocs()
 	b.ResetTimer()
+	b.ReportMetric(float64(1), "nprobe")
+	b.ReportMetric(float64(len(a.IVF.Centroids)), "centroids")
+	b.ReportMetric(benchmarkAvgRefsScanned(b, a.IVF, queries, 1), "refs/op")
 
 	for i := 0; i < b.N; i++ {
 		score, err := a.IVF.IvfSearch(queries[i%len(queries)], 5, 1)
@@ -207,6 +249,7 @@ func BenchmarkIVFSearchSmallestCluster(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
+	reportSearchMetrics(b, a.IVF, query, 1)
 
 	for i := 0; i < b.N; i++ {
 		score, err := a.IVF.IvfSearch(query, 5, 1)
@@ -224,6 +267,7 @@ func BenchmarkIVFSearchLargestCluster(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
+	reportSearchMetrics(b, a.IVF, query, 1)
 
 	for i := 0; i < b.N; i++ {
 		score, err := a.IVF.IvfSearch(query, 5, 1)
@@ -243,6 +287,8 @@ func BenchmarkFraudSearch(b *testing.B) {
 		b.Run(payload.name, func(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
+			reportPayloadMetrics(b, payload)
+			reportSearchMetrics(b, a.IVF, vec, 1)
 
 			for i := 0; i < b.N; i++ {
 				score, err := a.IVF.IvfSearch(vec, topK, 1)
@@ -260,9 +306,13 @@ func BenchmarkFraudPipeline(b *testing.B) {
 	a := loadBenchmarkApp(b)
 
 	for _, payload := range benchmarkPayloads() {
+		metricVec := a.MakeVector(payload.body)
+
 		b.Run(payload.name, func(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
+			reportPayloadMetrics(b, payload)
+			reportSearchMetrics(b, a.IVF, metricVec, 1)
 
 			for i := 0; i < b.N; i++ {
 				vec := a.MakeVector(payload.body)
@@ -282,10 +332,31 @@ func BenchmarkSonicDecode(b *testing.B) {
 		b.Run(payload.name, func(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
+			reportPayloadMetrics(b, payload)
+
+			var reader bytes.Reader
+			for i := 0; i < b.N; i++ {
+				var body vs.Payload
+				reader.Reset(payload.json)
+				if err := sonic.ConfigDefault.NewDecoder(&reader).Decode(&body); err != nil {
+					b.Fatal(err)
+				}
+				benchmarkPayload = body
+			}
+		})
+	}
+}
+
+func BenchmarkSonicUnmarshalBytes(b *testing.B) {
+	for _, payload := range benchmarkPayloads() {
+		b.Run(payload.name, func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+			reportPayloadMetrics(b, payload)
 
 			for i := 0; i < b.N; i++ {
 				var body vs.Payload
-				if err := sonic.ConfigDefault.NewDecoder(bytes.NewReader(payload.json)).Decode(&body); err != nil {
+				if err := sonic.Unmarshal(payload.json, &body); err != nil {
 					b.Fatal(err)
 				}
 				benchmarkPayload = body
@@ -301,6 +372,7 @@ func BenchmarkMakeVector(b *testing.B) {
 		b.Run(payload.name, func(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
+			reportPayloadMetrics(b, payload)
 
 			for i := 0; i < b.N; i++ {
 				benchmarkScore = a.MakeVector(payload.body)[0]
@@ -326,11 +398,20 @@ func BenchmarkSonicEncode(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		var buf bytes.Buffer
-		if err := sonic.ConfigDefault.NewEncoder(&buf).Encode(resp); err != nil {
+		if err := sonic.ConfigDefault.NewEncoder(io.Discard).Encode(resp); err != nil {
 			b.Fatal(err)
 		}
-		benchmarkStatus = buf.Len()
+	}
+}
+
+func BenchmarkPrecomputedResponseBody(b *testing.B) {
+	body := []byte(`{"approved":true,"fraud_score":0.4}` + "\n")
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.ReportMetric(float64(len(body)), "response_B/op")
+
+	for i := 0; i < b.N; i++ {
+		benchmarkBody = body
 	}
 }
 
@@ -339,6 +420,7 @@ func BenchmarkHTTPTestHarness(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
+	reportPayloadMetrics(b, payload)
 
 	for i := 0; i < b.N; i++ {
 		req := httptest.NewRequest(http.MethodPost, "/fraud-score", bytes.NewReader(payload.json))
@@ -356,6 +438,7 @@ func BenchmarkFraudHandler(b *testing.B) {
 		b.Run(payload.name, func(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
+			reportPayloadMetrics(b, payload)
 
 			for i := 0; i < b.N; i++ {
 				req := httptest.NewRequest(http.MethodPost, "/fraud-score", bytes.NewReader(payload.json))
@@ -378,6 +461,8 @@ func BenchmarkClosestCentroidsNProbe1(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
+	b.ReportMetric(float64(1), "nprobe")
+	b.ReportMetric(float64(len(a.IVF.Centroids)), "centroids")
 
 	for i := 0; i < b.N; i++ {
 		benchmarkIDs = a.IVF.ClosestCentroids(queries[i%len(queries)], 1)
@@ -390,8 +475,49 @@ func BenchmarkClosestCentroid(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
+	b.ReportMetric(float64(1), "nprobe")
+	b.ReportMetric(float64(len(a.IVF.Centroids)), "centroids")
 
 	for i := 0; i < b.N; i++ {
 		benchmarkID = a.IVF.ClosestCentroid(queries[i%len(queries)])
+	}
+}
+
+func BenchmarkIndexShape(b *testing.B) {
+	a := loadBenchmarkApp(b)
+
+	minRefs := int(a.IVF.Offsets[0].Count)
+	maxRefs := 0
+	totalRefs := 0
+	emptyClusters := 0
+
+	for _, offset := range a.IVF.Offsets {
+		count := int(offset.Count)
+		totalRefs += count
+		if count == 0 {
+			emptyClusters++
+		}
+		if count < minRefs {
+			minRefs = count
+		}
+		if count > maxRefs {
+			maxRefs = count
+		}
+	}
+
+	avgRefs := float64(totalRefs) / float64(len(a.IVF.Offsets))
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.ReportMetric(float64(len(a.IVF.Centroids)), "centroids")
+	b.ReportMetric(float64(len(a.IVF.Offsets)), "clusters")
+	b.ReportMetric(float64(emptyClusters), "empty_clusters")
+	b.ReportMetric(float64(totalRefs), "refs_total")
+	b.ReportMetric(avgRefs, "refs/cluster")
+	b.ReportMetric(float64(minRefs), "refs_min")
+	b.ReportMetric(float64(maxRefs), "refs_max")
+	b.ReportMetric(float64(len(a.IVF.VectorsData))/(1024*1024), "vectors_MiB")
+
+	for i := 0; i < b.N; i++ {
+		benchmarkStatus = totalRefs
 	}
 }

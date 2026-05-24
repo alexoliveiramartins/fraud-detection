@@ -40,9 +40,9 @@ func limit(n float32) float32 {
 func (a *App) MakeVector(p vs.Payload) vs.Vector {
 	var vec vs.Vector
 
-	vec[0] = limit(p.Transaction.Amount / a.Normalization["max_amount"])
-	vec[1] = limit(float32(p.Transaction.Installments) / a.Normalization["max_installments"])
-	vec[2] = limit((p.Transaction.Amount / p.Customer.AvgAmount) / a.Normalization["amount_vs_avg_ratio"])
+	vec[0] = limit(p.Transaction.Amount / a.Normalization.MaxAmount)
+	vec[1] = limit(float32(p.Transaction.Installments) / a.Normalization.MaxInstallments)
+	vec[2] = limit((p.Transaction.Amount / p.Customer.AvgAmount) / a.Normalization.AmountVsAvg)
 	vec[3] = float32(p.Transaction.RequestedAt.Hour()) / 23
 	weekDay := (int(p.Transaction.RequestedAt.Weekday()) + 6) % 7
 	vec[4] = float32(weekDay) / float32(6)
@@ -51,11 +51,11 @@ func (a *App) MakeVector(p vs.Payload) vs.Vector {
 		vec[6] = -1
 	} else {
 		minutesSinceLast := p.Transaction.RequestedAt.Sub(p.LastTransaction.Timestamp).Minutes()
-		vec[5] = limit(float32(minutesSinceLast) / a.Normalization["max_minutes"])
-		vec[6] = limit(p.LastTransaction.KmFromCurrent / a.Normalization["max_km"])
+		vec[5] = limit(float32(minutesSinceLast) / a.Normalization.MaxMinutes)
+		vec[6] = limit(p.LastTransaction.KmFromCurrent / a.Normalization.MaxKm)
 	}
-	vec[7] = limit(p.Terminal.KmFromHome / a.Normalization["max_km"])
-	vec[8] = limit(float32(p.Customer.TxCount24h) / a.Normalization["max_tx_count_24h"])
+	vec[7] = limit(p.Terminal.KmFromHome / a.Normalization.MaxKm)
+	vec[8] = limit(float32(p.Customer.TxCount24h) / a.Normalization.MaxTxCount)
 	if p.Terminal.IsOnline {
 		vec[9] = 1
 	} else {
@@ -79,7 +79,7 @@ func (a *App) MakeVector(p vs.Payload) vs.Vector {
 		vec[12] = 0.5
 	}
 
-	vec[13] = limit(p.Merchant.AvgAmount / a.Normalization["max_merchant_avg_amount"])
+	vec[13] = limit(p.Merchant.AvgAmount / a.Normalization.MaxMerchantAvg)
 
 	return vec
 }
