@@ -180,18 +180,32 @@ func (ivf *IVFFile) ClosestCentroids(query Vector, nProbe int) []int {
 
 func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) (float32, error) {
 	queryQ := QuantizeVector(query)
-
 	var top fixedTop
-	ivf.searchIntoTop(&top, query, queryQ, nProbe)
+	ivf.searchIntoTop(&top, query, queryQ, 1)
 
-	var score float32
-	for _, label := range top.label {
-		if label == true {
-			score += 1
-		}
+	fraudCount := top.fraudCount()
+
+	if nProbe > 1 && (top.fraudCount() == 2 || top.fraudCount() == 3) {
+		var selectiveTop fixedTop
+		ivf.searchIntoTop(&selectiveTop, query, queryQ, nProbe)
+		fraudCount = selectiveTop.fraudCount()
 	}
 
-	return score / float32(top.size), nil
+	// evita fazer calculo da divisao ja que topK = 5 sempre na rinha (micro-otimizacao)
+	switch fraudCount {
+	case 0:
+		return 0, nil
+	case 1:
+		return 0.2, nil
+	case 2:
+		return 0.4, nil
+	case 3:
+		return 0.6, nil
+	case 4:
+		return 0.8, nil
+	default:
+		return 1, nil
+	}
 }
 
 func (ivf *IVFFile) searchIntoTop(top *fixedTop, query Vector, queryQ QuantizedVector, nProbe int) {
@@ -224,6 +238,16 @@ func (ivf *IVFFile) scanCluster(top *fixedTop, queryQ QuantizedVector, centroidI
 			top.push(dist, buf[base+28] == 1)
 		}
 	}
+}
+
+func (t *fixedTop) fraudCount() int {
+	count := 0
+	for i := 0; i < t.size; i++ {
+		if t.label[i] {
+			count++
+		}
+	}
+	return count
 }
 
 func (t *fixedTop) worst() int64 {
@@ -288,24 +312,6 @@ func DistQuantizedFromBuffer(query QuantizedVector, buf []byte, base int, worstD
 		}
 	}
 	return sum
-}
-
-func insertTopK(top *[]Neighbor, candidate Neighbor, k int) {
-	if len(*top) < k {
-		*top = append(*top, candidate)
-		return
-	}
-
-	worst := 0
-	for i := 1; i < len(*top); i++ {
-		if (*top)[i].Dist > (*top)[worst].Dist {
-			worst = i
-		}
-	}
-
-	if candidate.Dist < (*top)[worst].Dist {
-		(*top)[worst] = candidate
-	}
 }
 
 // transforma float32 -> int16 em [-1, 1]

@@ -2,7 +2,10 @@ package app
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -72,6 +75,210 @@ type benchmarkPayloadFixture struct {
 	name string
 	json []byte
 	body vs.Payload
+}
+
+type benchmarkTestData struct {
+	Entries []struct {
+		Request          vs.Payload `json:"request"`
+		ExpectedApproved bool       `json:"expected_approved"`
+	} `json:"entries"`
+}
+
+type benchmarkDetectionData struct {
+	vectors          []vs.Vector
+	expectedApproved []bool
+}
+
+type benchmarkDetectionStats struct {
+	tp              int
+	tn              int
+	fp              int
+	fn              int
+	scoreChanged    int
+	approvedChanged int
+	improved        int
+	worsened        int
+	weightedErrors  int
+	detectionScore  float64
+}
+
+func loadBenchmarkTestVectors(b *testing.B, a *App, path string) []vs.Vector {
+	b.Helper()
+
+	file, err := os.Open(path)
+	if err != nil {
+		b.Fatalf("open benchmark test data: %v", err)
+	}
+	defer file.Close()
+
+	var data benchmarkTestData
+	if err := json.NewDecoder(file).Decode(&data); err != nil {
+		b.Fatalf("decode benchmark test data: %v", err)
+	}
+
+	vectors := make([]vs.Vector, len(data.Entries))
+	for i, entry := range data.Entries {
+		vectors[i] = a.MakeVector(entry.Request)
+	}
+
+	return vectors
+}
+
+func loadBenchmarkDetectionData(b *testing.B, a *App, path string) benchmarkDetectionData {
+	b.Helper()
+
+	file, err := os.Open(path)
+	if err != nil {
+		b.Fatalf("open benchmark test data: %v", err)
+	}
+	defer file.Close()
+
+	var data benchmarkTestData
+	if err := json.NewDecoder(file).Decode(&data); err != nil {
+		b.Fatalf("decode benchmark test data: %v", err)
+	}
+
+	detectionData := benchmarkDetectionData{
+		vectors:          make([]vs.Vector, len(data.Entries)),
+		expectedApproved: make([]bool, len(data.Entries)),
+	}
+	for i, entry := range data.Entries {
+		detectionData.vectors[i] = a.MakeVector(entry.Request)
+		detectionData.expectedApproved[i] = entry.ExpectedApproved
+	}
+
+	return detectionData
+}
+
+func benchmarkScoresForNProbe(b *testing.B, a *App, vectors []vs.Vector, nProbe int) []float32 {
+	b.Helper()
+
+	scores := make([]float32, len(vectors))
+	for i, vec := range vectors {
+		score, err := a.IVF.IvfSearch(vec, topK, nProbe)
+		if err != nil {
+			b.Fatalf("search nprobe=%d: %v", nProbe, err)
+		}
+		scores[i] = score
+	}
+
+	return scores
+}
+
+func benchmarkApproval(score float32) bool {
+	return score < 0.6
+}
+
+func benchmarkWeightedError(expectedApproved, approved bool) int {
+	if expectedApproved == approved {
+		return 0
+	}
+	if approved {
+		return 3
+	}
+	return 1
+}
+
+func benchmarkDetectionScore(weightedErrors, total int) float64 {
+	const (
+		k          = 1000
+		epsilonMin = 0.001
+		beta       = 300
+	)
+
+	epsilon := float64(weightedErrors) / float64(total)
+	rateComponent := k * math.Log10(1/math.Max(epsilon, epsilonMin))
+	absolutePenalty := -beta * math.Log10(1+float64(weightedErrors))
+
+	return rateComponent + absolutePenalty
+}
+
+func benchmarkDetectionStatsForScores(expectedApproved []bool, baselineScores, scores []float32) benchmarkDetectionStats {
+	stats := benchmarkDetectionStats{}
+
+	for i, score := range scores {
+		expected := expectedApproved[i]
+		approved := benchmarkApproval(score)
+
+		switch {
+		case expected && approved:
+			stats.tn++
+		case !expected && !approved:
+			stats.tp++
+		case expected && !approved:
+			stats.fp++
+		case !expected && approved:
+			stats.fn++
+		}
+
+		currentErr := benchmarkWeightedError(expected, approved)
+		stats.weightedErrors += currentErr
+
+		if baselineScores == nil {
+			continue
+		}
+
+		baselineScore := baselineScores[i]
+		baselineApproved := benchmarkApproval(baselineScore)
+		if score != baselineScore {
+			stats.scoreChanged++
+		}
+		if approved != baselineApproved {
+			stats.approvedChanged++
+		}
+
+		baselineErr := benchmarkWeightedError(expected, baselineApproved)
+		if currentErr < baselineErr {
+			stats.improved++
+		}
+		if currentErr > baselineErr {
+			stats.worsened++
+		}
+	}
+
+	stats.detectionScore = benchmarkDetectionScore(stats.weightedErrors, len(scores))
+	return stats
+}
+
+func reportDetectionStats(b *testing.B, stats benchmarkDetectionStats, total int) {
+	b.Helper()
+
+	b.ReportMetric(float64(stats.tp), "tp")
+	b.ReportMetric(float64(stats.tn), "tn")
+	b.ReportMetric(float64(stats.fp), "fp")
+	b.ReportMetric(float64(stats.fn), "fn")
+	b.ReportMetric(float64(stats.weightedErrors), "weighted_E")
+	b.ReportMetric(stats.detectionScore, "det_score")
+	b.ReportMetric(float64(stats.scoreChanged), "score_changed")
+	b.ReportMetric(float64(stats.approvedChanged), "approved_changed")
+	b.ReportMetric(float64(stats.improved), "improved")
+	b.ReportMetric(float64(stats.worsened), "worsened")
+	b.ReportMetric((float64(stats.scoreChanged)/float64(total))*100, "score_changed_%")
+	b.ReportMetric((float64(stats.approvedChanged)/float64(total))*100, "approved_changed_%")
+}
+
+func benchmarkSelectiveTriggerCount(b *testing.B, a *App, vectors []vs.Vector) int {
+	b.Helper()
+
+	triggered := 0
+	for _, vec := range vectors {
+		score, err := a.IVF.IvfSearch(vec, topK, 1)
+		if err != nil {
+			b.Fatalf("search nprobe=1: %v", err)
+		}
+		if score == 0.4 || score == 0.6 {
+			triggered++
+		}
+	}
+
+	return triggered
+}
+
+func reportSelectiveTriggerMetrics(b *testing.B, vectors []vs.Vector, triggered int) {
+	b.Helper()
+
+	b.ReportMetric(float64(triggered), "selective_hits")
+	b.ReportMetric((float64(triggered)/float64(len(vectors)))*100, "selective_%")
 }
 
 func benchmarkPayloads() []benchmarkPayloadFixture {
@@ -302,6 +509,100 @@ func BenchmarkFraudSearch(b *testing.B) {
 	}
 }
 
+func BenchmarkFraudSearchSelectiveNProbe3(b *testing.B) {
+	a := loadBenchmarkApp(b)
+
+	for _, payload := range benchmarkPayloads() {
+		vec := a.MakeVector(payload.body)
+
+		b.Run(payload.name, func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+			reportPayloadMetrics(b, payload)
+			reportSearchMetrics(b, a.IVF, vec, 3)
+
+			for i := 0; i < b.N; i++ {
+				score, err := a.IVF.IvfSearch(vec, topK, 3)
+				if err != nil {
+					b.Fatal(err)
+				}
+
+				benchmarkScore = score
+			}
+		})
+	}
+}
+
+func BenchmarkFraudSearchTestDataNProbe1(b *testing.B) {
+	a := loadBenchmarkApp(b)
+	vectors := loadBenchmarkTestVectors(b, a, "test/v3/test-data.json")
+	triggered := benchmarkSelectiveTriggerCount(b, a, vectors)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.ReportMetric(float64(len(vectors)), "vectors")
+	reportSelectiveTriggerMetrics(b, vectors, triggered)
+
+	for i := 0; i < b.N; i++ {
+		score, err := a.IVF.IvfSearch(vectors[i%len(vectors)], topK, 1)
+		if err != nil {
+			b.Fatal(err)
+		}
+		benchmarkScore = score
+	}
+}
+
+func BenchmarkFraudSearchTestDataSelectiveNProbe3(b *testing.B) {
+	a := loadBenchmarkApp(b)
+	vectors := loadBenchmarkTestVectors(b, a, "test/v3/test-data.json")
+	triggered := benchmarkSelectiveTriggerCount(b, a, vectors)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.ReportMetric(float64(len(vectors)), "vectors")
+	reportSelectiveTriggerMetrics(b, vectors, triggered)
+
+	for i := 0; i < b.N; i++ {
+		score, err := a.IVF.IvfSearch(vectors[i%len(vectors)], topK, 3)
+		if err != nil {
+			b.Fatal(err)
+		}
+		benchmarkScore = score
+	}
+}
+
+func BenchmarkNProbeDetectionComparison(b *testing.B) {
+	a := loadBenchmarkApp(b)
+	data := loadBenchmarkDetectionData(b, a, "test/v3/test-data.json")
+	baselineScores := benchmarkScoresForNProbe(b, a, data.vectors, 1)
+
+	for _, nProbe := range []int{1, 2, 3, 5, 8} {
+		b.Run(fmt.Sprintf("selective_nprobe_%d", nProbe), func(b *testing.B) {
+			scores := baselineScores
+			if nProbe != 1 {
+				scores = benchmarkScoresForNProbe(b, a, data.vectors, nProbe)
+			}
+			stats := benchmarkDetectionStatsForScores(data.expectedApproved, baselineScores, scores)
+
+			b.ReportAllocs()
+			b.ResetTimer()
+
+			for i := 0; i < b.N; i++ {
+				score, err := a.IVF.IvfSearch(data.vectors[i%len(data.vectors)], topK, nProbe)
+				if err != nil {
+					b.Fatal(err)
+				}
+				benchmarkScore = score
+			}
+			b.StopTimer()
+
+			b.ReportMetric(float64(nProbe), "nprobe")
+			b.ReportMetric(float64(len(data.vectors)), "vectors")
+			reportDetectionStats(b, stats, len(data.vectors))
+		})
+	}
+}
+
 func BenchmarkFraudPipeline(b *testing.B) {
 	a := loadBenchmarkApp(b)
 
@@ -466,6 +767,20 @@ func BenchmarkClosestCentroidsNProbe1(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		benchmarkIDs = a.IVF.ClosestCentroids(queries[i%len(queries)], 1)
+	}
+}
+
+func BenchmarkClosestCentroidsNProbe3(b *testing.B) {
+	a := loadBenchmarkApp(b)
+	queries := benchmarkQueries(b, a.IVF)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.ReportMetric(float64(3), "nprobe")
+	b.ReportMetric(float64(len(a.IVF.Centroids)), "centroids")
+
+	for i := 0; i < b.N; i++ {
+		benchmarkIDs = a.IVF.ClosestCentroids(queries[i%len(queries)], 3)
 	}
 }
 

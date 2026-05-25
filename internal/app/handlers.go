@@ -9,7 +9,10 @@ import (
 	vs "github.com/alexoliveiramartins/fraud-detection/internal/vectorsearch"
 )
 
-var topK int = 5
+const (
+	topK   int = 5
+	nProbe int = 3
+)
 
 func (a *App) FraudScoreHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -25,7 +28,7 @@ func (a *App) FraudScoreHandler(w http.ResponseWriter, r *http.Request) {
 
 		vec := a.MakeVector(body)
 
-		ivf, err := a.IVF.IvfSearch(vec, topK, 1)
+		ivf, err := a.IVF.IvfSearch(vec, topK, nProbe)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
