@@ -1,7 +1,6 @@
 package vectorsearch
 
 import (
-	"encoding/binary"
 	"math"
 	"math/rand"
 	"sort"
@@ -158,11 +157,11 @@ func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) (float32, error) 
 	fraudCount := top.fraudCount()
 
 	// busca em mais clusters para casos de borda (fraudscore = 0.4 e 0.6)
-	if nProbe > 1 && (fraudCount == 2 || fraudCount == 3) {
-		var selectiveTop fixedTop
-		ivf.searchIntoTop(&selectiveTop, query, queryQ, nProbe)
-		fraudCount = selectiveTop.fraudCount()
-	}
+	// if nProbe > 1 && (fraudCount == 2 || fraudCount == 3) {
+	// 	var selectiveTop fixedTop
+	// 	ivf.searchIntoTop(&selectiveTop, query, queryQ, nProbe)
+	// 	fraudCount = selectiveTop.fraudCount()
+	// }
 
 	// evita fazer calculo da divisao ja que topK = 5 sempre na rinha (micro-otimizacao)
 	switch fraudCount {
@@ -321,16 +320,92 @@ func (t *fixedTop) recomputeWorst() {
 
 func DistQuantizedFromBuffer(query QuantizedVector, buf []byte, base int, worstDist int64) int64 {
 	var sum int64
-	for dim := 0; dim < 14; dim++ {
-		pos := base + dim*2
-		refValue := int16(binary.LittleEndian.Uint16(buf[pos : pos+2]))
 
-		diff := int64(query[dim]) - int64(refValue)
-		sum += diff * diff
-		if sum >= worstDist {
-			return sum
-		}
+	// for loop unrolled para melhor performance e menos alloc/req
+	diff0 := int64(query[0]) - int64(int16(uint16(buf[base])|uint16(buf[base+1])<<8))
+	sum += diff0 * diff0
+	if sum >= worstDist {
+		return sum
 	}
+
+	diff1 := int64(query[1]) - int64(int16(uint16(buf[base+2])|uint16(buf[base+3])<<8))
+	sum += diff1 * diff1
+	if sum >= worstDist {
+		return sum
+	}
+
+	diff2 := int64(query[2]) - int64(int16(uint16(buf[base+4])|uint16(buf[base+5])<<8))
+	sum += diff2 * diff2
+	if sum >= worstDist {
+		return sum
+	}
+
+	diff3 := int64(query[3]) - int64(int16(uint16(buf[base+6])|uint16(buf[base+7])<<8))
+	sum += diff3 * diff3
+	if sum >= worstDist {
+		return sum
+	}
+
+	diff4 := int64(query[4]) - int64(int16(uint16(buf[base+8])|uint16(buf[base+9])<<8))
+	sum += diff4 * diff4
+	if sum >= worstDist {
+		return sum
+	}
+
+	diff5 := int64(query[5]) - int64(int16(uint16(buf[base+10])|uint16(buf[base+11])<<8))
+	sum += diff5 * diff5
+	if sum >= worstDist {
+		return sum
+	}
+
+	diff6 := int64(query[6]) - int64(int16(uint16(buf[base+12])|uint16(buf[base+13])<<8))
+	sum += diff6 * diff6
+	if sum >= worstDist {
+		return sum
+	}
+
+	diff7 := int64(query[7]) - int64(int16(uint16(buf[base+14])|uint16(buf[base+15])<<8))
+	sum += diff7 * diff7
+	if sum >= worstDist {
+		return sum
+	}
+
+	diff8 := int64(query[8]) - int64(int16(uint16(buf[base+16])|uint16(buf[base+17])<<8))
+	sum += diff8 * diff8
+	if sum >= worstDist {
+		return sum
+	}
+
+	diff9 := int64(query[9]) - int64(int16(uint16(buf[base+18])|uint16(buf[base+19])<<8))
+	sum += diff9 * diff9
+	if sum >= worstDist {
+		return sum
+	}
+
+	diff10 := int64(query[10]) - int64(int16(uint16(buf[base+20])|uint16(buf[base+21])<<8))
+	sum += diff10 * diff10
+	if sum >= worstDist {
+		return sum
+	}
+
+	diff11 := int64(query[11]) - int64(int16(uint16(buf[base+22])|uint16(buf[base+23])<<8))
+	sum += diff11 * diff11
+	if sum >= worstDist {
+		return sum
+	}
+
+	diff12 := int64(query[12]) - int64(int16(uint16(buf[base+24])|uint16(buf[base+25])<<8))
+	sum += diff12 * diff12
+	if sum >= worstDist {
+		return sum
+	}
+
+	diff13 := int64(query[13]) - int64(int16(uint16(buf[base+26])|uint16(buf[base+27])<<8))
+	sum += diff13 * diff13
+	if sum >= worstDist {
+		return sum
+	}
+
 	return sum
 }
 

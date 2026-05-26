@@ -579,7 +579,7 @@ func BenchmarkNProbeDetectionComparison(b *testing.B) {
 	data := loadBenchmarkDetectionData(b, a, "test/v3/test-data.json")
 	baselineScores := benchmarkScoresForNProbe(b, a, data.vectors, 1)
 
-	for _, nProbe := range []int{1, 2, 3, 5, 8} {
+	for _, nProbe := range []int{1, 2, 3} {
 		b.Run(fmt.Sprintf("selective_nprobe_%d", nProbe), func(b *testing.B) {
 			scores := baselineScores
 			if nProbe != 1 {
