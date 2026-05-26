@@ -1,6 +1,6 @@
 services:
   api1:
-    build: .
+    image: ghcr.io/alexoliveiramartins/fraud-detection:latest
     hostname: api1
     platform: linux/amd64
     networks:
@@ -12,7 +12,7 @@ services:
           memory: "160MB"
 
   api2:
-    build: .
+    image: ghcr.io/alexoliveiramartins/fraud-detection:latest
     hostname: api2
     platform: linux/amd64
     networks:
@@ -22,7 +22,7 @@ services:
         limits:
           cpus: "0.4"
           memory: "160MB"
-          
+
   haproxy:
     image: haproxy:3.0-alpine
     hostname: haproxy
