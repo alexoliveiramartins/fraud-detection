@@ -157,11 +157,11 @@ func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) (float32, error) 
 	fraudCount := top.fraudCount()
 
 	// busca em mais clusters para casos de borda (fraudscore = 0.4 e 0.6)
-	// if nProbe > 1 && (fraudCount == 2 || fraudCount == 3) {
-	// 	var selectiveTop fixedTop
-	// 	ivf.searchIntoTop(&selectiveTop, query, queryQ, nProbe)
-	// 	fraudCount = selectiveTop.fraudCount()
-	// }
+	if nProbe > 1 && (fraudCount == 2 || fraudCount == 3) {
+		var selectiveTop fixedTop
+		ivf.searchIntoTop(&selectiveTop, query, queryQ, nProbe)
+		fraudCount = selectiveTop.fraudCount()
+	}
 
 	// evita fazer calculo da divisao ja que topK = 5 sempre na rinha (micro-otimizacao)
 	switch fraudCount {
