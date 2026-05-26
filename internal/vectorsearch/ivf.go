@@ -12,6 +12,7 @@ const (
 	Int16ReferenceSize = 29
 	fixedTopK          = 5
 	QuantScale         = 10000
+	maxNProbe          = 3
 )
 
 type QuantizedVector [14]int16
@@ -149,35 +150,6 @@ func (ivf *IVFFile) ClosestCentroid(query Vector) int {
 	return bestID
 }
 
-func (ivf *IVFFile) ClosestCentroids(query Vector, nProbe int) []int {
-	ids := make([]int, 0, nProbe)
-
-	for i := range nProbe {
-		ids = append(ids, i)
-	}
-
-	sort.Slice(ids, func(c, j int) bool {
-		distI := Dist(query, ivf.Centroids[ids[c]])
-		distJ := Dist(query, ivf.Centroids[ids[j]])
-
-		return distI < distJ
-	})
-
-	for i := nProbe; i < len(ivf.Centroids); i++ {
-		// preenche os n primeiros elementos
-		if Dist(query, ivf.Centroids[i]) < Dist(query, ivf.Centroids[ids[nProbe-1]]) {
-			ids[nProbe-1] = i
-			sort.Slice(ids, func(c, j int) bool {
-				distI := Dist(query, ivf.Centroids[ids[c]])
-				distJ := Dist(query, ivf.Centroids[ids[j]])
-
-				return distI < distJ
-			})
-		}
-	}
-	return ids
-}
-
 func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) (float32, error) {
 	queryQ := QuantizeVector(query)
 	var top fixedTop
@@ -185,7 +157,8 @@ func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) (float32, error) 
 
 	fraudCount := top.fraudCount()
 
-	if nProbe > 1 && (top.fraudCount() == 2 || top.fraudCount() == 3) {
+	// busca em mais clusters para casos de borda (fraudscore = 0.4 e 0.6)
+	if nProbe > 1 && (fraudCount == 2 || fraudCount == 3) {
 		var selectiveTop fixedTop
 		ivf.searchIntoTop(&selectiveTop, query, queryQ, nProbe)
 		fraudCount = selectiveTop.fraudCount()
@@ -208,6 +181,51 @@ func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) (float32, error) 
 	}
 }
 
+// preenche "ids" com os ids dos (nProbe) centroides mais proximos
+func (ivf *IVFFile) ClosestCentroids(query Vector, nProbe int, ids *[maxNProbe]int) {
+	var dists [maxNProbe]float32
+	size := 0
+	worstIdx := 0
+	var worstDist float32
+
+	for id := 0; id < len(ivf.Centroids); id++ {
+		dist := Dist(query, ivf.Centroids[id])
+
+		// preenche os nProbe primeiros
+		if size < nProbe {
+			ids[size] = id
+			dists[size] = dist
+
+			// escolhe a pior distancia e o indice dela
+			if size == 0 || dist > worstDist {
+				worstDist = dist
+				worstIdx = size
+			}
+
+			size++
+			continue
+		}
+		// (early exit) pula se a distancia ja for pior do que a pior distancia no topK
+		if dist >= worstDist {
+			continue
+		}
+
+		// substitui a pior distancia atual pela nova
+		ids[worstIdx] = id
+		dists[worstIdx] = dist
+
+		// escolhe novamente a pior distancia
+		worstIdx = 0
+		worstDist = dists[0]
+		for i := 1; i < nProbe; i++ {
+			if dists[i] > worstDist {
+				worstDist = dists[i]
+				worstIdx = i
+			}
+		}
+	}
+}
+
 func (ivf *IVFFile) searchIntoTop(top *fixedTop, query Vector, queryQ QuantizedVector, nProbe int) {
 	if nProbe <= 1 {
 		centroidID := ivf.ClosestCentroid(query)
@@ -215,9 +233,11 @@ func (ivf *IVFFile) searchIntoTop(top *fixedTop, query Vector, queryQ QuantizedV
 		return
 	}
 
-	centroidIDs := ivf.ClosestCentroids(query, nProbe)
-	for _, centroidID := range centroidIDs {
-		ivf.scanCluster(top, queryQ, centroidID)
+	var centroidIDs [maxNProbe]int
+	ivf.ClosestCentroids(query, nProbe, &centroidIDs)
+
+	for i := 0; i < nProbe; i++ {
+		ivf.scanCluster(top, queryQ, centroidIDs[i])
 	}
 }
 

@@ -402,7 +402,10 @@ func benchmarkRefsScanned(b *testing.B, ivf vs.IVFFile, query vs.Vector, nProbe 
 	}
 
 	refs := 0
-	for _, centroidID := range ivf.ClosestCentroids(query, nProbe) {
+	var centroidIDs [3]int
+	ivf.ClosestCentroids(query, nProbe, &centroidIDs)
+	for i := 0; i < nProbe; i++ {
+		centroidID := centroidIDs[i]
 		refs += int(ivf.Offsets[centroidID].Count)
 	}
 	return refs
@@ -766,7 +769,9 @@ func BenchmarkClosestCentroidsNProbe1(b *testing.B) {
 	b.ReportMetric(float64(len(a.IVF.Centroids)), "centroids")
 
 	for i := 0; i < b.N; i++ {
-		benchmarkIDs = a.IVF.ClosestCentroids(queries[i%len(queries)], 1)
+		var ids [3]int
+		a.IVF.ClosestCentroids(queries[i%len(queries)], 1, &ids)
+		benchmarkID = ids[0]
 	}
 }
 
@@ -780,7 +785,9 @@ func BenchmarkClosestCentroidsNProbe3(b *testing.B) {
 	b.ReportMetric(float64(len(a.IVF.Centroids)), "centroids")
 
 	for i := 0; i < b.N; i++ {
-		benchmarkIDs = a.IVF.ClosestCentroids(queries[i%len(queries)], 3)
+		var ids [3]int
+		a.IVF.ClosestCentroids(queries[i%len(queries)], 3, &ids)
+		benchmarkID = ids[0]
 	}
 }
 
