@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: read
+      contents: write
       packages: write
 
     steps:
@@ -32,3 +32,18 @@ jobs:
           tags: |
             ghcr.io/alexoliveiramartins/fraud-detection:latest
             ghcr.io/alexoliveiramartins/fraud-detection:${{ github.sha }}
+
+      - uses: actions/checkout@v4
+        with:
+          ref: submission
+          path: submission
+
+      - name: Update submission compose image
+        working-directory: submission
+        run: |
+          sed -i -E 's|ghcr\.io/alexoliveiramartins/fraud-detection:[^[:space:]]+|ghcr.io/alexoliveiramartins/fraud-detection:${{ github.sha }}|g' docker-compose.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docker-compose.yml
+          git commit -m "chore: update submission image tag" || exit 0
+          git push origin HEAD:submission

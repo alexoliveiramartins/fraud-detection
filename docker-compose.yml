@@ -3,6 +3,8 @@ services:
     build: .
     hostname: api1
     platform: linux/amd64
+    environment:
+      - GOMAXPROCS=1
     networks:
       - fraud-network
     deploy:
@@ -15,6 +17,8 @@ services:
     build: .
     hostname: api2
     platform: linux/amd64
+    environment:
+      - GOMAXPROCS=1
     networks:
       - fraud-network
     deploy:
