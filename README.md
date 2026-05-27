@@ -7,7 +7,7 @@ The service receives card transaction payloads, converts them into 14-dimensiona
 ## Stack
 
 - Go
-- nginx (Load Balancer)
+- haproxy (Load Balancer)
 - Docker / Docker Compose
 
 ## Architecture
@@ -15,12 +15,12 @@ The service receives card transaction payloads, converts them into 14-dimensiona
 The application follows the required Rinha topology: one load balancer in front of two API instances.
 
 ```txt
-Client ──> nginx:9999 (round-robin) 
+Client ──> haproxy:9999 (round-robin) 
             ├── api1:8080
             └── api2:8080
 ```
 
-Nginx only distributes requests between the two APIs. It does not inspect payloads or apply any fraud-detection logic. The API instances are stateless and load the same index files, so any request can be handled by either instance.
+haproxy only distributes requests between the two APIs. It does not inspect payloads or apply any fraud-detection logic. The API instances are stateless and load the same index files, so any request can be handled by either instance.
 
 ### Vector Search
 
@@ -46,7 +46,7 @@ Service | CPU | Memory|
 -----:|-----:|-------:|
 api1 | 0.4 | 160Mb |
 api2 | 0.4 | 160Mb |
-nginx | 0.2 | 30Mb | 
+haproxy | 0.2 | 30Mb | 
 **Total** | **1** | **350Mb** | 
 
 ## Optimizations
@@ -58,6 +58,10 @@ nginx | 0.2 | 30Mb |
 - `sonic/encoding` for json incoding instead of `encoding/json` for faster serializing & deserializing
 - `nProbe` = 1 / `nCentroids` = 1024 for best precision x performance balance
 - Heap-like TopK to avoid sorting all vectors on a cluster
+- Unroll the loop of the distance function for better performance
+- Trade nginx for Haproxy to handle more requests/sec
+- Use tcp on Haproxy configuration for lower overhead than http mode
+- Adaptative nProbe to treat edge cases where fraudscore is 0.4 or 0.6 (fraud/legit boundaries)
 
 ## Pre-requisites
 
@@ -145,7 +149,7 @@ The `submission` branch uses this image directly instead of building from source
 
 ## Rinha Compliance
 
-- Two API instances behind an Nginx round-robin load balancer.
+- Two API instances behind an Haproxy round-robin load balancer.
 - Public API exposed on port `9999`.
 - `linux/amd64` compatible image.
 - Docker bridge network.
