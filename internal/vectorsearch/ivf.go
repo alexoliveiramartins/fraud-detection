@@ -11,7 +11,7 @@ const (
 	Int16ReferenceSize = 29
 	fixedTopK          = 5
 	QuantScale         = 10000
-	maxNProbe          = 3
+	MaxNProbe          = 12
 )
 
 type QuantizedVector [14]int16
@@ -153,16 +153,15 @@ func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) (float32, error) 
 	queryQ := QuantizeVector(query)
 	var top fixedTop
 
-	var centroidIDs [maxNProbe]int
-	ivf.ClosestCentroids(query, nProbe, &centroidIDs)
-	closestCentroidID := centroidIDs[0]
-
+	closestCentroidID := ivf.ClosestCentroid(query)
 	ivf.scanCluster(&top, queryQ, closestCentroidID)
 
 	fraudCount := top.fraudCount()
 
 	// busca em mais clusters para casos de borda (fraudscore = 0.4 e 0.6)
 	if nProbe > 1 && (fraudCount == 2 || fraudCount == 3) {
+		var centroidIDs [MaxNProbe]int
+		ivf.ClosestCentroids(query, nProbe, &centroidIDs)
 		ivf.searchIntoAdditionalTop(&top, queryQ, nProbe, centroidIDs, closestCentroidID)
 		fraudCount = top.fraudCount()
 	}
@@ -185,8 +184,8 @@ func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) (float32, error) 
 }
 
 // preenche "ids" com os ids dos (nProbe) centroides mais proximos
-func (ivf *IVFFile) ClosestCentroids(query Vector, nProbe int, ids *[maxNProbe]int) {
-	var dists [maxNProbe]float32
+func (ivf *IVFFile) ClosestCentroids(query Vector, nProbe int, ids *[MaxNProbe]int) {
+	var dists [MaxNProbe]float32
 	size := 0
 	worstIdx := 0
 	var worstDist float32
@@ -226,22 +225,6 @@ func (ivf *IVFFile) ClosestCentroids(query Vector, nProbe int, ids *[maxNProbe]i
 				worstIdx = i
 			}
 		}
-
-		// insertion sort para ordenar as distancias sem alloc
-		for i := 1; i < nProbe; i++ {
-			id := ids[i]
-			dist := dists[i]
-
-			j := i - 1
-			for j >= 0 && dists[j] > dist {
-				ids[j+1] = ids[j]
-				dists[j+1] = dists[j]
-				j--
-			}
-
-			ids[j+1] = id
-			dists[j+1] = dist
-		}
 	}
 }
 
@@ -249,7 +232,7 @@ func (ivf *IVFFile) searchIntoAdditionalTop(
 	top *fixedTop,
 	queryQ QuantizedVector,
 	nProbe int,
-	centroidIDs [maxNProbe]int,
+	centroidIDs [MaxNProbe]int,
 	skipID int,
 ) {
 	for i := 0; i < nProbe; i++ {

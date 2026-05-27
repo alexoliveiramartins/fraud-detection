@@ -1,0 +1,10 @@
+services:
+  api1:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+
+  api2:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
