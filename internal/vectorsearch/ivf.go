@@ -149,6 +149,7 @@ func (ivf *IVFFile) ClosestCentroid(query Vector) int {
 	return bestID
 }
 
+// hot path da aplicacao
 func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) (float32, error) {
 	queryQ := QuantizeVector(query)
 	var top fixedTop
@@ -159,7 +160,7 @@ func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) (float32, error) 
 	fraudCount := top.fraudCount()
 
 	// busca em mais clusters para casos de borda (fraudscore = 0.4 e 0.6)
-	if nProbe > 1 && (fraudCount == 2 || fraudCount == 3) {
+	if nProbe > 1 {
 		var centroidIDs [MaxNProbe]int
 		ivf.ClosestCentroids(query, nProbe, &centroidIDs)
 		ivf.searchIntoAdditionalTop(&top, queryQ, nProbe, centroidIDs, closestCentroidID)
