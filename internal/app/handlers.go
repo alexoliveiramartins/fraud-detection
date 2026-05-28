@@ -30,7 +30,10 @@ func (a *App) FraudScoreHandler(w http.ResponseWriter, r *http.Request) {
 
 		ivf, err := a.IVF.IvfSearch(vec, topK, nProbe)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			sonic.ConfigDefault.NewEncoder(w).Encode(vs.Response{
+				Approved:   false,
+				FraudScore: 1,
+			})
 			return
 		}
 
