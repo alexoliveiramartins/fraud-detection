@@ -1,6 +1,7 @@
 package vectorsearch
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
 	"sort"
@@ -11,7 +12,7 @@ const (
 	Int16ReferenceSize = 29
 	fixedTopK          = 5
 	QuantScale         = 10000
-	MaxNProbe          = 18
+	MaxNProbe          = 12
 )
 
 type QuantizedVector [14]int16
@@ -63,21 +64,65 @@ func (ivf *IVF) ClosestCentroid(vec Vector) int {
 	return centroid
 }
 
-func TrainCentroids(items []Reference, nCentroids int) []Vector {
+func InitCentroidsKmeansPlus(items []Reference, nCentroids int, seed int64) []Vector {
+	rng := rand.New(rand.NewSource(seed))
+
 	centroids := make([]Vector, nCentroids)
+	minDists := make([]float32, len(items))
 
-	// inicializa os centroids com os n primeiros vetores aleatorios (seed fixa)
-	rng := rand.New(rand.NewSource(42))
-	perm := rng.Perm(len(items))
+	first := rng.Intn(len(items))
+	centroids[0] = items[first].Vector
 
-	for i := 0; i < nCentroids; i++ {
-		centroids[i] = items[perm[i]].Vector
+	for i := range items {
+		minDists[i] = Dist(items[i].Vector, centroids[0])
 	}
 
-	maxIterations := 20
+	// escolhe o centroide mais distante (soma) dos centroides escolhidos
+	for c := 1; c < nCentroids; c++ {
+		var total float64
+		for _, d := range minDists {
+			total += float64(d)
+		}
+
+		if total == 0 {
+			centroids[c] = items[rng.Intn(len(items))].Vector
+			continue
+		}
+
+		target := rng.Float64() * total
+		var acc float64
+		chosen := len(items) - 1
+
+		for i, d := range minDists {
+			acc += float64(d)
+			if acc >= target {
+				chosen = i
+				break
+			}
+		}
+
+		centroids[c] = items[chosen].Vector
+
+		for i := range items {
+			d := Dist(items[i].Vector, centroids[c])
+			if d < minDists[i] {
+				minDists[i] = d
+			}
+		}
+	}
+
+	return centroids
+}
+
+func TrainCentroids(items []Reference, nCentroids int) []Vector {
+	// init com kmeans++
+	centroids := InitCentroidsKmeansPlus(items, nCentroids, 42)
+	fmt.Printf("Treinando centroides...\n")
+	maxIterations := 10
 	for iter := 0; iter < maxIterations; iter++ {
-		// para cada centroide (m), um array de vetores (n) -> matriz (m)x(n)
-		groups := make([][]Vector, nCentroids)
+		fmt.Printf("Iteração numero: %d \r", iter)
+		sums := make([]Vector, nCentroids)
+		counts := make([]int, nCentroids)
 
 		for _, item := range items {
 			closest := 0
@@ -91,29 +136,22 @@ func TrainCentroids(items []Reference, nCentroids int) []Vector {
 					closest = i
 				}
 			}
-			// adiciona cada vetor na array do seu centroide mais perto (closest)
-			groups[closest] = append(groups[closest], item.Vector)
+
+			counts[closest]++
+			for j := 0; j < 14; j++ {
+				sums[closest][j] += item.Vector[j]
+			}
 		}
 
-		// centroid[i] = MÉDIA dos vetores de cada centroide no grupo (k-means)
 		for i := 0; i < nCentroids; i++ {
-			if len(groups[i]) == 0 {
+			if counts[i] == 0 {
 				continue
 			}
 
-			var newCentroid Vector
-			// calcula a media somando cada dimensao de todos os vetores dos grupos...
-			for _, vec := range groups[i] {
-				for j := 0; j < 14; j++ {
-					newCentroid[j] += vec[j]
-				}
-			}
-			// ... e divide pelo tamanho do grupo
+			inv := 1 / float32(counts[i])
 			for j := 0; j < 14; j++ {
-				newCentroid[j] /= float32(len(groups[i]))
+				centroids[i][j] = sums[i][j] * inv
 			}
-			// o vetor médio vira o centroide
-			centroids[i] = newCentroid
 		}
 	}
 	return centroids

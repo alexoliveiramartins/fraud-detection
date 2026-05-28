@@ -39,3 +39,4 @@ test/*
 Makefile
 bench.sh
 out.txt
+backup
