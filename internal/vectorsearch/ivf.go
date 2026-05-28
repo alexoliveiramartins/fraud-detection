@@ -154,16 +154,18 @@ func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) (float32, error) 
 	queryQ := QuantizeVector(query)
 	var top fixedTop
 
-	closestCentroidID := ivf.ClosestCentroid(query)
-	ivf.scanCluster(&top, queryQ, closestCentroidID)
+	var centroidIDs [MaxNProbe]int
+	ivf.ClosestCentroids(query, MaxNProbe, &centroidIDs)
+
+	// closestCentroidID := ivf.ClosestCentroid(query)
+
+	ivf.searchIntoAdditionalTop(&top, queryQ, &centroidIDs, 0, nProbe)
 
 	fraudCount := top.fraudCount()
 
 	// busca em mais clusters para casos de borda (fraudscore = 0.4 e 0.6)
-	if nProbe > 1 {
-		var centroidIDs [MaxNProbe]int
-		ivf.ClosestCentroids(query, nProbe, &centroidIDs)
-		ivf.searchIntoAdditionalTop(&top, queryQ, nProbe, centroidIDs, closestCentroidID)
+	if fraudCount == 2 || fraudCount == 3 {
+		ivf.searchIntoAdditionalTop(&top, queryQ, &centroidIDs, nProbe, MaxNProbe)
 		fraudCount = top.fraudCount()
 	}
 
@@ -185,7 +187,11 @@ func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) (float32, error) 
 }
 
 // preenche "ids" com os ids dos (nProbe) centroides mais proximos
-func (ivf *IVFFile) ClosestCentroids(query Vector, nProbe int, ids *[MaxNProbe]int) {
+func (ivf *IVFFile) ClosestCentroids(
+	query Vector,
+	nProbe int,
+	ids *[MaxNProbe]int,
+) {
 	var dists [MaxNProbe]float32
 	size := 0
 	worstIdx := 0
@@ -227,19 +233,35 @@ func (ivf *IVFFile) ClosestCentroids(query Vector, nProbe int, ids *[MaxNProbe]i
 			}
 		}
 	}
+
+	for i := 1; i < nProbe; i++ {
+		id := ids[i]
+		dist := dists[i]
+		j := i - 1
+
+		for j >= 0 && dists[j] > dist {
+			ids[j+1] = ids[j]
+			dists[j+1] = dists[j]
+			j--
+		}
+
+		ids[j+1] = id
+		dists[j+1] = dist
+	}
 }
 
 func (ivf *IVFFile) searchIntoAdditionalTop(
 	top *fixedTop,
 	queryQ QuantizedVector,
-	nProbe int,
-	centroidIDs [MaxNProbe]int,
-	skipID int,
+	centroidIDs *[MaxNProbe]int,
+	// skipID int,
+	start int,
+	end int,
 ) {
-	for i := 0; i < nProbe; i++ {
-		if centroidIDs[i] == skipID {
-			continue
-		}
+	for i := start; i < end; i++ {
+		// if centroidIDs[i] == skipID {
+		// 	continue
+		// }
 		ivf.scanCluster(top, queryQ, centroidIDs[i])
 	}
 }
