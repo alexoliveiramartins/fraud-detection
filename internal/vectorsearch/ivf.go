@@ -118,7 +118,7 @@ func TrainCentroids(items []Reference, nCentroids int) []Vector {
 	// init com kmeans++
 	centroids := InitCentroidsKmeansPlus(items, nCentroids, 42)
 	fmt.Printf("Treinando centroides...\n")
-	maxIterations := 10
+	maxIterations := 15
 	for iter := 0; iter < maxIterations; iter++ {
 		fmt.Printf("Iteração numero: %d \r", iter)
 		sums := make([]Vector, nCentroids)

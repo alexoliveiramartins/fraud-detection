@@ -11,7 +11,7 @@ import (
 
 const (
 	topK   int = 5
-	nProbe int = 8
+	nProbe int = 6
 )
 
 func (a *App) FraudScoreHandler(w http.ResponseWriter, r *http.Request) {
