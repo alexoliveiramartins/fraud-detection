@@ -123,10 +123,44 @@ func TrainCentroids(items []Reference, nCentroids int) []Vector {
 func Dist(a, b Vector) float32 {
 	var sum float32
 
-	for i := 0; i < 14; i++ {
-		diff := a[i] - b[i]
-		sum += diff * diff
-	}
+	diff1 := a[1] - b[1]
+	sum += diff1 * diff1
+
+	diff2 := a[2] - b[2]
+	sum += diff2 * diff2
+
+	diff3 := a[3] - b[3]
+	sum += diff3 * diff3
+
+	diff4 := a[4] - b[4]
+	sum += diff4 * diff4
+
+	diff5 := a[5] - b[5]
+	sum += diff5 * diff5
+
+	diff6 := a[6] - b[6]
+	sum += diff6 * diff6
+
+	diff7 := a[7] - b[7]
+	sum += diff7 * diff7
+
+	diff8 := a[8] - b[8]
+	sum += diff8 * diff8
+
+	diff9 := a[9] - b[9]
+	sum += diff9 * diff9
+
+	diff10 := a[10] - b[10]
+	sum += diff10 * diff10
+
+	diff11 := a[11] - b[11]
+	sum += diff11 * diff11
+
+	diff12 := a[12] - b[12]
+	sum += diff12 * diff12
+
+	diff13 := a[13] - b[13]
+	sum += diff13 * diff13
 
 	return sum
 }
