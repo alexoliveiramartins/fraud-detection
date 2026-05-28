@@ -11,7 +11,7 @@ const (
 	Int16ReferenceSize = 29
 	fixedTopK          = 5
 	QuantScale         = 10000
-	MaxNProbe          = 18
+	MaxNProbe          = 12
 )
 
 type QuantizedVector [14]int16
