@@ -238,7 +238,7 @@ func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) (float32, error) 
 	fraudCount := top.fraudCount()
 
 	// busca em mais clusters para casos de borda (fraudscore = 0.4 e 0.6)
-	if fraudCount == 2 || fraudCount == 3 {
+	if fraudCount == 2 {
 		ivf.searchIntoAdditionalTop(&top, queryQ, &centroidIDs, nProbe, MaxNProbe)
 		fraudCount = top.fraudCount()
 	}
