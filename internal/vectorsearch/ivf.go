@@ -12,7 +12,7 @@ const (
 	Int16ReferenceSize = 29
 	fixedTopK          = 5
 	QuantScale         = 10000
-	MaxNProbe          = 12
+	MaxNProbe          = 24
 )
 
 type QuantizedVector [14]int16
@@ -79,6 +79,7 @@ func InitCentroidsKmeansPlus(items []Reference, nCentroids int, seed int64) []Ve
 
 	// escolhe o centroide mais distante (soma) dos centroides escolhidos
 	for c := 1; c < nCentroids; c++ {
+		fmt.Printf("Inicializando centroide %d...\r", c)
 		var total float64
 		for _, d := range minDists {
 			total += float64(d)
@@ -110,21 +111,22 @@ func InitCentroidsKmeansPlus(items []Reference, nCentroids int, seed int64) []Ve
 			}
 		}
 	}
-
+	fmt.Println(" ")
 	return centroids
 }
 
 func TrainCentroids(items []Reference, nCentroids int) []Vector {
 	// init com kmeans++
-	centroids := InitCentroidsKmeansPlus(items, nCentroids, 42)
+	fmt.Printf("Inicializando centroides com kmeans++...\n")
+	centroids := InitCentroidsKmeansPlus(items, nCentroids, 80)
 	fmt.Printf("Treinando centroides...\n")
-	maxIterations := 15
+	maxIterations := 10
 	for iter := 0; iter < maxIterations; iter++ {
-		fmt.Printf("Iteração numero: %d \r", iter)
 		sums := make([]Vector, nCentroids)
 		counts := make([]int, nCentroids)
 
-		for _, item := range items {
+		for i, item := range items {
+			fmt.Printf("Iteração numero: %d | Item (3M): %d \r", iter, i)
 			closest := 0
 			bestDist := Dist(item.Vector, centroids[0])
 

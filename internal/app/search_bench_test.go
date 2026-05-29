@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"testing"
 	"time"
 
@@ -377,6 +378,65 @@ func benchmarkClusterExtremes(b *testing.B, ivf vs.IVFFile) (smallest, largest i
 	}
 
 	return smallest, largest
+}
+
+func BenchmarkClusterMetrics(b *testing.B) {
+	a := loadBenchmarkApp(b)
+
+	counts := make([]int, len(a.IVF.Offsets))
+	total := 0
+	empty := 0
+
+	for i, offset := range a.IVF.Offsets {
+		count := int(offset.Count)
+		counts[i] = count
+		total += count
+		if count == 0 {
+			empty++
+		}
+	}
+
+	sort.Ints(counts)
+
+	percentile := func(p float64) int {
+		if len(counts) == 0 {
+			return 0
+		}
+		idx := int(float64(len(counts)-1) * p)
+		return counts[idx]
+	}
+
+	avg := float64(total) / float64(len(counts))
+	min := counts[0]
+	p50 := percentile(0.50)
+	p75 := percentile(0.75)
+	p90 := percentile(0.90)
+	p95 := percentile(0.95)
+	p99 := percentile(0.99)
+	max := counts[len(counts)-1]
+
+	b.ReportMetric(float64(len(counts)), "clusters")
+	b.ReportMetric(float64(total), "refs")
+	b.ReportMetric(avg, "avg_refs/cluster")
+	b.ReportMetric(float64(empty), "empty_clusters")
+	b.ReportMetric(float64(min), "min_refs")
+	b.ReportMetric(float64(p50), "p50_refs")
+	b.ReportMetric(float64(p75), "p75_refs")
+	b.ReportMetric(float64(p90), "p90_refs")
+	b.ReportMetric(float64(p95), "p95_refs")
+	b.ReportMetric(float64(p99), "p99_refs")
+	b.ReportMetric(float64(max), "max_refs")
+	b.ReportMetric(float64(p99)/avg, "p99/avg")
+	b.ReportMetric(float64(max)/avg, "max/avg")
+
+	b.Logf("clusters=%d refs=%d avg=%.1f empty=%d", len(counts), total, avg, empty)
+	b.Logf("min=%d p50=%d p75=%d p90=%d p95=%d p99=%d max=%d", min, p50, p75, p90, p95, p99, max)
+	b.Logf("p99/avg=%.2f max/avg=%.2f", float64(p99)/avg, float64(max)/avg)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		benchmarkID = max
+	}
 }
 
 func benchmarkQueries(b *testing.B, ivf vs.IVFFile) []vs.Vector {
