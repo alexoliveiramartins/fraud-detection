@@ -15,12 +15,41 @@ const (
 	MaxNProbe          = 128
 )
 
-var nProbeScaling = [6]int{16, 16, 48, 28, 96, 16}
+var nProbeScaling = [6]int{16, 16, 32, 28, 32, 16}
 
 type QuantizedVector [14]int16
 
+func SampleReferences(items []Reference, sampleSize int, seed int64) []Reference {
+	if sampleSize >= len(items) {
+		return items
+	}
+
+	rng := rand.New(rand.NewSource(seed))
+
+	ids := make([]int, len(items))
+	for i := range ids {
+		ids[i] = i
+	}
+
+	for i := 0; i < sampleSize; i++ {
+		j := i + rng.Intn(len(items)-i)
+		ids[i], ids[j] = ids[j], ids[i]
+	}
+
+	sample := make([]Reference, sampleSize)
+	for i := 0; i < sampleSize; i++ {
+		sample[i] = items[ids[i]]
+	}
+
+	return sample
+}
+
 func (ivf *IVF) Build(items []Reference, nCentroids int) {
-	ivf.Centroids = TrainCentroids(items, nCentroids)
+	sampleSize := 65536
+	var seed int64 = 80
+	sample := SampleReferences(items, sampleSize, seed)
+
+	ivf.Centroids = TrainCentroids(sample, nCentroids)
 	ivf.Lists = make([][]Reference, nCentroids)
 
 	// para cada item, acha o centroide mais perto
@@ -81,7 +110,7 @@ func InitCentroidsKmeansPlus(items []Reference, nCentroids int, seed int64) []Ve
 
 	// escolhe o centroide mais distante (soma) dos centroides escolhidos
 	for c := 1; c < nCentroids; c++ {
-		fmt.Printf("Inicializando centroide %d...\r", c)
+		// fmt.Printf("Inicializando centroide %d...\r", c)
 		var total float64
 		for _, d := range minDists {
 			total += float64(d)
@@ -113,7 +142,7 @@ func InitCentroidsKmeansPlus(items []Reference, nCentroids int, seed int64) []Ve
 			}
 		}
 	}
-	fmt.Println(" ")
+	// fmt.Println(" ")
 	return centroids
 }
 
@@ -122,13 +151,13 @@ func TrainCentroids(items []Reference, nCentroids int) []Vector {
 	fmt.Printf("Inicializando centroides com kmeans++...\n")
 	centroids := InitCentroidsKmeansPlus(items, nCentroids, 80)
 	fmt.Printf("Treinando centroides...\n")
-	maxIterations := 10
+	maxIterations := 8
 	for iter := 0; iter < maxIterations; iter++ {
 		sums := make([]Vector, nCentroids)
 		counts := make([]int, nCentroids)
 
-		for i, item := range items {
-			fmt.Printf("Iteração numero: %d | Item (3M): %d \r", iter, i)
+		for _, item := range items {
+			// fmt.Printf("Iteração numero: %d | Item (3M): %d \r", iter, i)
 			closest := 0
 			bestDist := Dist(item.Vector, centroids[0])
 
