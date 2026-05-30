@@ -8,6 +8,7 @@ import (
 )
 
 func main() {
+	
 	app := &app.App{}
 
 	fmt.Printf("Carregando mcc_risk.json...\n")
