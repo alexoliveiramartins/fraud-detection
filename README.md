@@ -15,7 +15,7 @@ The service receives card transaction payloads, converts them into 14-dimensiona
 The application follows the required Rinha topology: one load balancer in front of two API instances.
 
 ```txt
-Client ──> haproxy:9999 (round-robin) 
+Client ──> haproxy:9999 (round-robin)
             ├── api1:8080
             └── api2:8080
 ```
@@ -40,28 +40,28 @@ At runtime, the request flow is:
 
 ### Resource Distribution
 
-The Docker Compose setup stays within the challenge limit of `1 CPU` and `350MB`. 
+The Docker Compose setup stays within the challenge limit of `1 CPU` and `350MB`.
 
-Service | CPU | Memory|
------:|-----:|-------:|
-api1 | 0.4 | 160Mb |
-api2 | 0.4 | 160Mb |
-haproxy | 0.2 | 30Mb | 
-**Total** | **1** | **350Mb** | 
+|   Service |   CPU |    Memory |
+| --------: | ----: | --------: |
+|      api1 |   0.4 |     160Mb |
+|      api2 |   0.4 |     160Mb |
+|   haproxy |   0.2 |      30Mb |
+| **Total** | **1** | **350Mb** |
 
 ## Optimizations
 
-- Use of IVF search instead of brute-force and HSNW for better memory usage / performance with the avaliable resources of the challenge 
+- Use of IVF search instead of brute-force and HSNW for better memory usage / performance with the avaliable resources of the challenge
 - Pre-processing of the reference vectors to binary (.bin) file
 - In-memory loading of the vectors/IVF indexes from the .bin files with `mmap` to avoid heap pressuring
-- Vector dimensions Quantization from `float32` to `int16` for a smaller vectors binary while keeping precision 
+- Vector dimensions Quantization from `float32` to `int16` for a smaller vectors binary while keeping precision
 - `sonic/encoding` for json incoding instead of `encoding/json` for faster serializing & deserializing
-- `nProbe` = 1 / `nCentroids` = 1024 for best precision x performance balance
+- `nProbe` = 12 / `nCentroids` = 1024 for best precision x performance balance
 - Heap-like TopK to avoid sorting all vectors on a cluster
 - Unroll the loop of the distance function for better performance
 - Trade nginx for Haproxy to handle more requests/sec
 - Use tcp on Haproxy configuration for lower overhead than http mode
-- Adaptative nProbe to treat edge cases where fraudscore is 0.4 or 0.6 (fraud/legit boundaries)
+- Adaptative nProbe to treat edge cases
 
 ## Pre-requisites
 
@@ -79,7 +79,8 @@ go run ./tools/preprocess.go
 docker compose up --build
 ```
 
-- Run using the ghcr hosted Docker container on the `submission` branch 
+- Run using the ghcr hosted Docker container on the `submission` branch
+
 ```bash
 # Switch to the submission branch
 git checkout submission
@@ -90,7 +91,7 @@ docker compose up
 
 ## API endpoints
 
-### `GET /health`
+### `GET /ready`
 
 - API status/health endpoint
 
@@ -98,42 +99,39 @@ docker compose up
 
 - Recieves a transaction payload and gives a fraud score
 
-Example: 
+Example:
 
 ```json
 {
-    "id": "tx-1329056812",
-    "transaction": {
-        "amount": 41.12,
-        "installments": 2,
-        "requested_at": "2026-03-11T18:45:53Z"
-    },
-    "customer": {
-        "avg_amount": 82.24,
-        "tx_count_24h": 3,
-        "known_merchants": [
-            "MERC-003",
-            "MERC-016"
-        ]
-    },
-    "merchant": {
-        "id": "MERC-016",
-        "mcc": "5411",
-        "avg_amount": 60.25
-    },
-    "terminal": {
-        "is_online": false,
-        "card_present": true,
-        "km_from_home": 29.23
-    },
-    "last_transaction": null
+  "id": "tx-1329056812",
+  "transaction": {
+    "amount": 41.12,
+    "installments": 2,
+    "requested_at": "2026-03-11T18:45:53Z"
+  },
+  "customer": {
+    "avg_amount": 82.24,
+    "tx_count_24h": 3,
+    "known_merchants": ["MERC-003", "MERC-016"]
+  },
+  "merchant": {
+    "id": "MERC-016",
+    "mcc": "5411",
+    "avg_amount": 60.25
+  },
+  "terminal": {
+    "is_online": false,
+    "card_present": true,
+    "km_from_home": 29.23
+  },
+  "last_transaction": null
 }
 ```
 
 ```json
 {
-    "approved": true,
-    "fraud_score": 0
+  "approved": true,
+  "fraud_score": 0
 }
 ```
 

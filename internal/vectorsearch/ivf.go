@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
-	"sort"
 )
 
 // const Float32ReferenceSize = 57
@@ -15,7 +14,7 @@ const (
 	MaxNProbe          = 64
 )
 
-var nProbeScaling = [6]int{12, 12, 48, 32, 12, 12}
+var nProbeScaling = [6]int{12, 12, 32, 64, 12, 12}
 
 type QuantizedVector [14]int16
 
@@ -85,27 +84,6 @@ func (ivf *IVF) Build(items []Reference, nCentroids int) {
 		centroid := ivf.ClosestCentroid(item.Vector)
 		ivf.Lists[centroid] = append(ivf.Lists[centroid], item)
 	}
-}
-
-func (ivf *IVF) ClosestCentroids(query Vector, nProbe int) []int {
-	ids := make([]int, len(ivf.Centroids))
-
-	for i := range ivf.Centroids {
-		ids[i] = i
-	}
-
-	sort.Slice(ids, func(i, j int) bool {
-		distI := Dist(query, ivf.Centroids[ids[i]])
-		distJ := Dist(query, ivf.Centroids[ids[j]])
-
-		return distI < distJ
-	})
-
-	if nProbe > len(ids) {
-		nProbe = len(ids)
-	}
-
-	return ids[:nProbe]
 }
 
 func (ivf *IVF) ClosestCentroid(vec Vector) int {
@@ -220,6 +198,9 @@ func TrainCentroids(items []Reference, nCentroids int) []Vector {
 // distancia euclidiana ao quadrado (d2)
 func Dist(a, b Vector) float32 {
 	var sum float32
+
+	diff0 := a[0] - b[0]
+	sum += diff0 * diff0
 
 	diff1 := a[1] - b[1]
 	sum += diff1 * diff1

@@ -6,11 +6,6 @@ import (
 	vs "github.com/alexoliveiramartins/fraud-detection/internal/vectorsearch"
 )
 
-type Neighbour struct {
-	Index int
-	Dist  float32
-}
-
 func MakeResponse(score float32) vs.Response {
 	appr := false
 	if score < 0.6 {
@@ -20,15 +15,6 @@ func MakeResponse(score float32) vs.Response {
 		Approved:   appr,
 		FraudScore: score,
 	}
-}
-
-func distEuclid(vec1 vs.Vector, vec2 vs.Vector) float32 {
-	var sum float32
-	for i := range 14 {
-		diff := vec1[i] - vec2[i]
-		sum += diff * diff
-	}
-	return sum
 }
 
 func limit(n float32) float32 {

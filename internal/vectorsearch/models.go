@@ -68,11 +68,6 @@ type Response struct {
 
 type Vector [14]float32
 
-type Neighbor struct {
-	Dist  int64
-	Label bool // true se fraude
-}
-
 type IVF struct {
 	Centroids []Vector
 	Lists     [][]Reference
