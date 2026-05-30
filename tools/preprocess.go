@@ -149,6 +149,52 @@ func writeClusters(vectorsPath, offsetsPath string, clusters [][]Reference) {
 	}
 }
 
+func writeBBoxes(path string, clusters [][]Reference) {
+	output, err := os.Create(path)
+	if err != nil {
+		panic(err)
+	}
+	defer output.Close()
+
+	count := uint32(len(clusters))
+	if err := binary.Write(output, binary.LittleEndian, count); err != nil {
+		panic(err)
+	}
+
+	for _, cluster := range clusters {
+		var min QuantizedVector
+		var max QuantizedVector
+
+		for d := 0; d < 14; d++ {
+			min[d] = 32767
+			max[d] = -32768
+		}
+
+		for _, ref := range cluster {
+			for d, value := range ref.Vector {
+				q := EncodeFloat(value)
+				if q < min[d] {
+					min[d] = q
+				}
+				if q > max[d] {
+					max[d] = q
+				}
+			}
+		}
+
+		for d := 0; d < 14; d++ {
+			if err := binary.Write(output, binary.LittleEndian, min[d]); err != nil {
+				panic(err)
+			}
+		}
+		for d := 0; d < 14; d++ {
+			if err := binary.Write(output, binary.LittleEndian, max[d]); err != nil {
+				panic(err)
+			}
+		}
+	}
+}
+
 func main() {
 	rawRefs := loadReferences()
 	refs := toReferences(rawRefs)
@@ -160,6 +206,6 @@ func main() {
 	}
 
 	writeCentroids("resources/ivf/centroids.bin", ivfIndex.Centroids)
-	// fmt.Printf("wrote %d centroids\n", len(ivfIndex.Centroids))
 	writeClusters("resources/ivf/vectors.bin", "resources/ivf/offsets.bin", ivfIndex.Lists)
+	writeBBoxes("resources/ivf/bbox.bin", ivfIndex.Lists)
 }

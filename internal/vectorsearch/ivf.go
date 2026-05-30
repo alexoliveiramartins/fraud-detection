@@ -15,7 +15,7 @@ const (
 	MaxNProbe          = 64
 )
 
-var nProbeScaling = [6]int{12, 16, 28, 28, 28, 12}
+var nProbeScaling = [6]int{12, 12, 48, 32, 12, 12}
 
 type QuantizedVector [14]int16
 
@@ -42,6 +42,33 @@ func SampleReferences(items []Reference, sampleSize int, seed int64) []Reference
 	}
 
 	return sample
+}
+
+func (ivf *IVFFile) bboxLowerBound(query QuantizedVector, centroidID int, worst int64) int64 {
+	min := ivf.BBoxMin[centroidID]
+	max := ivf.BBoxMax[centroidID]
+
+	var sum int64
+
+	for d := 0; d < 14; d++ {
+		q := query[d]
+
+		var diff int64
+		if q < min[d] {
+			diff = int64(min[d]) - int64(q)
+		} else if q > max[d] {
+			diff = int64(q) - int64(max[d])
+		} else {
+			diff = 0
+		}
+
+		sum += diff * diff
+		if sum >= worst {
+			return sum
+		}
+	}
+
+	return sum
 }
 
 func (ivf *IVF) Build(items []Reference, nCentroids int) {
@@ -373,6 +400,15 @@ func (ivf *IVFFile) searchIntoAdditionalTop(
 }
 
 func (ivf *IVFFile) scanCluster(top *fixedTop, queryQ QuantizedVector, centroidID int) {
+	worst := top.worst()
+
+	if len(ivf.BBoxMin) > 0 && worst != math.MaxInt64 {
+		lb := ivf.bboxLowerBound(queryQ, centroidID, worst)
+		if lb >= worst {
+			return
+		}
+	}
+	
 	cluster := ivf.Offsets[centroidID]
 
 	start := int(cluster.Offset)

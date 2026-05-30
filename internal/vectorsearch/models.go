@@ -83,6 +83,8 @@ type IVFFile struct {
 	Offsets     []ClusterOffset
 	VectorsData []byte
 	VectorsFile *os.File
+	BBoxMin     []QuantizedVector
+	BBoxMax     []QuantizedVector
 }
 
 type ClusterOffset struct {

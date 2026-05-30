@@ -32,6 +32,11 @@ func main() {
 		panic(err)
 	}
 
+	err = app.LoadBBoxes()
+	if err != nil {
+		panic(err)
+	}
+
 	app.Warmup()
 
 	http.HandleFunc("/ready", app.ReadyHandler)

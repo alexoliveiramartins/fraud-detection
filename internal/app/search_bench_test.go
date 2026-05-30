@@ -65,6 +65,9 @@ func loadBenchmarkApp(b *testing.B) *App {
 	if err := a.LoadOffsets(); err != nil {
 		b.Fatalf("load offsets and vectors: %v", err)
 	}
+	if err := a.LoadBBoxes(); err != nil {
+		b.Fatalf("load bboxes: %v", err)
+	}
 	if len(a.IVF.Centroids) == 0 || len(a.IVF.Offsets) == 0 {
 		b.Fatal("IVF benchmark data is empty")
 	}

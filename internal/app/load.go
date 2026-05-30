@@ -104,6 +104,39 @@ func (a *App) LoadNormalization() error {
 	return nil
 }
 
+func (a *App) LoadBBoxes() error {
+	file, err := os.Open("resources/ivf/bbox.bin")
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	var count uint32
+	if err := binary.Read(file, binary.LittleEndian, &count); err != nil {
+		return err
+	}
+
+	mins := make([]vs.QuantizedVector, count)
+	maxs := make([]vs.QuantizedVector, count)
+
+	for i := 0; i < int(count); i++ {
+		for d := 0; d < 14; d++ {
+			if err := binary.Read(file, binary.LittleEndian, &mins[i][d]); err != nil {
+				return err
+			}
+		}
+		for d := 0; d < 14; d++ {
+			if err := binary.Read(file, binary.LittleEndian, &maxs[i][d]); err != nil {
+				return err
+			}
+		}
+	}
+
+	a.IVF.BBoxMin = mins
+	a.IVF.BBoxMax = maxs
+	return nil
+}
+
 func (a *App) LoadOffsets() error {
 	file, err := os.Open("resources/ivf/offsets.bin")
 	if err != nil {
