@@ -12,10 +12,10 @@ const (
 	Int16ReferenceSize = 29
 	fixedTopK          = 5
 	QuantScale         = 10000
-	MaxNProbe          = 128
+	MaxNProbe          = 64
 )
 
-var nProbeScaling = [6]int{16, 16, 32, 28, 32, 16}
+var nProbeScaling = [6]int{12, 16, 28, 28, 28, 12}
 
 type QuantizedVector [14]int16
 
@@ -46,7 +46,7 @@ func SampleReferences(items []Reference, sampleSize int, seed int64) []Reference
 
 func (ivf *IVF) Build(items []Reference, nCentroids int) {
 	sampleSize := 65536
-	var seed int64 = 80
+	var seed int64 = 42
 	sample := SampleReferences(items, sampleSize, seed)
 
 	ivf.Centroids = TrainCentroids(sample, nCentroids)
