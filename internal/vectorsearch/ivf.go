@@ -12,8 +12,10 @@ const (
 	Int16ReferenceSize = 29
 	fixedTopK          = 5
 	QuantScale         = 10000
-	MaxNProbe          = 24
+	MaxNProbe          = 128
 )
+
+var nProbeScaling = [6]int{16, 16, 48, 28, 96, 16}
 
 type QuantizedVector [14]int16
 
@@ -237,9 +239,10 @@ func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) (float32, error) 
 
 	fraudCount := top.fraudCount()
 
-	// busca em mais clusters para casos de borda (fraudscore = 0.4 e 0.6)
-	if fraudCount == 2 {
-		ivf.searchIntoAdditionalTop(&top, queryQ, &centroidIDs, nProbe, MaxNProbe)
+	// busca em mais clusters dinamicamente
+	additionalClusters := nProbeScaling[fraudCount] - nProbe
+	if additionalClusters > 0 {
+		ivf.searchIntoAdditionalTop(&top, queryQ, &centroidIDs, nProbe, nProbeScaling[fraudCount])
 		fraudCount = top.fraudCount()
 	}
 
