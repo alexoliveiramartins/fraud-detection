@@ -1,8 +1,13 @@
 services:
   api1:
-    image: ghcr.io/alexoliveiramartins/fraud-detection:49075604933f4a156b670329eb8420160a0ec2af
+    build: .
     hostname: api1
     platform: linux/amd64
+    environment:
+      - GOMAXPROCS=1
+      - API_SOCKET=/var/run/rinha/api1.sock
+    volumes:
+      - socket-dir:/var/run/rinha
     networks:
       - fraud-network
     deploy:
@@ -12,9 +17,14 @@ services:
           memory: "160MB"
 
   api2:
-    image: ghcr.io/alexoliveiramartins/fraud-detection:49075604933f4a156b670329eb8420160a0ec2af
+    build: .
     hostname: api2
     platform: linux/amd64
+    environment:
+      - GOMAXPROCS=1
+      - API_SOCKET=/var/run/rinha/api2.sock
+    volumes:
+      - socket-dir:/var/run/rinha
     networks:
       - fraud-network
     deploy:
@@ -31,6 +41,7 @@ services:
       - "9999:9999"
     volumes:
       - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - socket-dir:/var/run/rinha
     depends_on:
       - api1
       - api2
@@ -45,3 +56,6 @@ services:
 networks:
   fraud-network:
     driver: bridge
+
+volumes:
+  socket-dir:
