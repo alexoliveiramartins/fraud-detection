@@ -90,18 +90,18 @@ func (ivf *IVF) Build(items []Reference, nCentroids int) {
 		centroid := ivf.Centroids[clusterID]
 
 		sort.Slice(ivf.Lists[clusterID], func(i, j int) bool {
-			return Dist(ivf.Lists[clusterID][i].Vector, centroid) <
-				Dist(ivf.Lists[clusterID][j].Vector, centroid)
+			return Dist(&ivf.Lists[clusterID][i].Vector, &centroid) <
+				Dist(&ivf.Lists[clusterID][j].Vector, &centroid)
 		})
 	}
 }
 
 func (ivf *IVF) ClosestCentroid(vec Vector) int {
-	closest := Dist(vec, ivf.Centroids[0])
+	closest := Dist(&vec, &ivf.Centroids[0])
 	centroid := 0
 
 	for j := 1; j < len(ivf.Centroids); j++ {
-		d := Dist(vec, ivf.Centroids[j])
+		d := Dist(&vec, &ivf.Centroids[j])
 		if d < closest {
 			closest = d
 			centroid = j
@@ -120,7 +120,7 @@ func InitCentroidsKmeansPlus(items []Reference, nCentroids int, seed int64) []Ve
 	centroids[0] = items[first].Vector
 
 	for i := range items {
-		minDists[i] = Dist(items[i].Vector, centroids[0])
+		minDists[i] = Dist(&items[i].Vector, &centroids[0])
 	}
 
 	// escolhe o centroide mais distante (soma) dos centroides escolhidos
@@ -151,7 +151,7 @@ func InitCentroidsKmeansPlus(items []Reference, nCentroids int, seed int64) []Ve
 		centroids[c] = items[chosen].Vector
 
 		for i := range items {
-			d := Dist(items[i].Vector, centroids[c])
+			d := Dist(&items[i].Vector, &centroids[c])
 			if d < minDists[i] {
 				minDists[i] = d
 			}
@@ -174,11 +174,11 @@ func TrainCentroids(items []Reference, nCentroids int) []Vector {
 		for _, item := range items {
 			// fmt.Printf("Iteração numero: %d | Item (3M): %d \r", iter, i)
 			closest := 0
-			bestDist := Dist(item.Vector, centroids[0])
+			bestDist := Dist(&item.Vector, &centroids[0])
 
 			// para cada (item), acha o centroide mais perto
 			for i := 1; i < nCentroids; i++ {
-				d := Dist(item.Vector, centroids[i])
+				d := Dist(&item.Vector, &centroids[i])
 				if d < bestDist {
 					bestDist = d
 					closest = i
@@ -206,7 +206,7 @@ func TrainCentroids(items []Reference, nCentroids int) []Vector {
 }
 
 // distancia euclidiana ao quadrado (d2)
-func Dist(a, b Vector) float32 {
+func Dist(a, b *Vector) float32 {
 	var sum float32
 
 	diff0 := a[0] - b[0]
@@ -258,10 +258,10 @@ func Dist(a, b Vector) float32 {
 
 func (ivf *IVFFile) ClosestCentroid(query Vector) int {
 	bestID := 0
-	bestDist := Dist(query, ivf.Centroids[0])
+	bestDist := Dist(&query, &ivf.Centroids[0])
 
 	for id := 1; id < len(ivf.Centroids); id++ {
-		dist := Dist(query, ivf.Centroids[id])
+		dist := Dist(&query, &ivf.Centroids[id])
 
 		if dist < bestDist {
 			bestID = id
@@ -273,12 +273,12 @@ func (ivf *IVFFile) ClosestCentroid(query Vector) int {
 }
 
 // hot path da aplicacao
-func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) (int) {
+func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) int {
 	queryQ := QuantizeVector(query)
 	var top fixedTop
 
 	var centroidIDs [MaxNProbe]int
-	ivf.ClosestCentroids(query, MaxNProbe, &centroidIDs)
+	ivf.ClosestCentroids(&query, &centroidIDs)
 
 	// closestCentroidID := ivf.ClosestCentroid(query)
 
@@ -298,8 +298,7 @@ func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) (int) {
 
 // preenche "ids" com os ids dos (nProbe) centroides mais proximos
 func (ivf *IVFFile) ClosestCentroids(
-	query Vector,
-	nProbe int,
+	query *Vector,
 	ids *[MaxNProbe]int,
 ) {
 	var dists [MaxNProbe]float32
@@ -308,10 +307,10 @@ func (ivf *IVFFile) ClosestCentroids(
 	var worstDist float32
 
 	for id := 0; id < len(ivf.Centroids); id++ {
-		dist := Dist(query, ivf.Centroids[id])
+		dist := Dist(query, &ivf.Centroids[id])
 
 		// preenche os nProbe primeiros
-		if size < nProbe {
+		if size < MaxNProbe {
 			ids[size] = id
 			dists[size] = dist
 
@@ -336,7 +335,7 @@ func (ivf *IVFFile) ClosestCentroids(
 		// escolhe novamente a pior distancia
 		worstIdx = 0
 		worstDist = dists[0]
-		for i := 1; i < nProbe; i++ {
+		for i := 1; i < MaxNProbe; i++ {
 			if dists[i] > worstDist {
 				worstDist = dists[i]
 				worstIdx = i
@@ -344,7 +343,7 @@ func (ivf *IVFFile) ClosestCentroids(
 		}
 	}
 
-	for i := 1; i < nProbe; i++ {
+	for i := 1; i < MaxNProbe; i++ {
 		id := ids[i]
 		dist := dists[i]
 		j := i - 1
@@ -385,7 +384,7 @@ func (ivf *IVFFile) scanCluster(top *fixedTop, queryQ QuantizedVector, centroidI
 			return
 		}
 	}
-	
+
 	cluster := ivf.Offsets[centroidID]
 
 	start := int(cluster.Offset)
@@ -395,6 +394,7 @@ func (ivf *IVFFile) scanCluster(top *fixedTop, queryQ QuantizedVector, centroidI
 	for i := 0; i < int(cluster.Count); i++ {
 		base := i * Int16ReferenceSize
 
+		_ = buf[base+28] // bound check pro compilador
 		worst := top.worst()
 		dist := DistQuantizedFromBuffer(queryQ, buf, base, worst)
 
@@ -464,6 +464,8 @@ func (t *fixedTop) recomputeWorst() {
 }
 
 func DistQuantizedFromBuffer(query QuantizedVector, buf []byte, base int, worstDist int64) int64 {
+	_ = buf[base+27] // bound check pro compilador
+
 	var sum int64
 
 	// for loop unrolled para melhor performance e menos alloc/req

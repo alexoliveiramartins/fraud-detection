@@ -45,7 +45,7 @@ func forceAllSearch(a *App, query vs.Vector, nProbe int) float32 {
 	var top forceAllTop
 
 	var centroidIDs [vs.MaxNProbe]int
-	a.IVF.ClosestCentroids(query, nProbe, &centroidIDs)
+	a.IVF.ClosestCentroids(&query, &centroidIDs)
 	for i := 0; i < nProbe; i++ {
 		forceAllScanCluster(a, &top, queryQ, centroidIDs[i])
 	}

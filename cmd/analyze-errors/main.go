@@ -239,7 +239,7 @@ func traceSearch(a *app.App, query vs.Vector, nProbe int, forceAll bool) searchT
 	if nProbe > 1 && (forceAll || initialFraudCount == 2 || initialFraudCount == 3) {
 		trace.Selective = true
 		var centroidIDs [vs.MaxNProbe]int
-		a.IVF.ClosestCentroids(query, nProbe, &centroidIDs)
+		a.IVF.ClosestCentroids(&query, &centroidIDs)
 		trace.CentroidIDs = centroidIDs[:nProbe:nProbe]
 
 		for i := 0; i < nProbe; i++ {

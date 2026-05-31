@@ -464,7 +464,7 @@ func benchmarkRefsScanned(b *testing.B, ivf vs.IVFFile, query vs.Vector, nProbe 
 
 	refs := 0
 	var centroidIDs [vs.MaxNProbe]int
-	ivf.ClosestCentroids(query, nProbe, &centroidIDs)
+	ivf.ClosestCentroids(&query, &centroidIDs)
 	for i := 0; i < nProbe; i++ {
 		centroidID := centroidIDs[i]
 		refs += int(ivf.Offsets[centroidID].Count)
@@ -791,35 +791,35 @@ func BenchmarkFraudHandler(b *testing.B) {
 	}
 }
 
-func BenchmarkClosestCentroidsNProbe1(b *testing.B) {
+func BenchmarkClosestCentroidsMax(b *testing.B) {
 	a := loadBenchmarkApp(b)
 	queries := benchmarkQueries(b, a.IVF)
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	b.ReportMetric(float64(1), "nprobe")
+	b.ReportMetric(float64(vs.MaxNProbe), "nprobe")
 	b.ReportMetric(float64(len(a.IVF.Centroids)), "centroids")
 
 	for i := 0; i < b.N; i++ {
 		var ids [vs.MaxNProbe]int
-		a.IVF.ClosestCentroids(queries[i%len(queries)], 1, &ids)
+		a.IVF.ClosestCentroids(&queries[i%len(queries)], &ids)
 		benchmarkID = ids[0]
 	}
 }
 
-func BenchmarkClosestCentroidsNProbe3(b *testing.B) {
+func BenchmarkClosestCentroidsMaxFirst3(b *testing.B) {
 	a := loadBenchmarkApp(b)
 	queries := benchmarkQueries(b, a.IVF)
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	b.ReportMetric(float64(3), "nprobe")
+	b.ReportMetric(float64(vs.MaxNProbe), "nprobe")
 	b.ReportMetric(float64(len(a.IVF.Centroids)), "centroids")
 
 	for i := 0; i < b.N; i++ {
 		var ids [vs.MaxNProbe]int
-		a.IVF.ClosestCentroids(queries[i%len(queries)], 3, &ids)
-		benchmarkID = ids[0]
+		a.IVF.ClosestCentroids(&queries[i%len(queries)], &ids)
+		benchmarkID = ids[0] + ids[1] + ids[2]
 	}
 }
 
