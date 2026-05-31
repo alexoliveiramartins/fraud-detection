@@ -26,7 +26,7 @@ type App struct {
 }
 
 func (a *App) Warmup() {
-	const step = 4
+	const step = 1
 
 	for i := 0; i < len(a.IVF.Centroids); i += step {
 		_ = a.IVF.IvfSearch(a.IVF.Centroids[i], topK, nProbe)

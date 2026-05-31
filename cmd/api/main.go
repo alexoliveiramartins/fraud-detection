@@ -39,26 +39,34 @@ func main() {
 		panic(err)
 	}
 
-	// app.Warmup()
+	app.Warmup()
 
 	http.HandleFunc("/ready", app.ReadyHandler)
 	http.HandleFunc("/fraud-score", app.FraudScoreHandler)
-	
+
 	socketPath := os.Getenv("API_SOCKET")
 	if socketPath != "" {
 		_ = os.Remove(socketPath)
+
 		ln, err := net.Listen("unix", socketPath)
 		if err != nil {
 			panic(err)
 		}
-		_ = os.Chmod(socketPath, 0666)
 		defer ln.Close()
 
+		_ = os.Chmod(socketPath, 0666)
+
+		fmt.Println("Server running on unix socket", socketPath)
 		err = http.Serve(ln, nil)
 	} else {
+		fmt.Println("Server running on http://localhost:8080")
 		err = http.ListenAndServe(":8080", nil)
 	}
-	
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
 	// err = http.ListenAndServe(":8080", nil)
 	// if err != nil {
 	// 	fmt.Println(err)
