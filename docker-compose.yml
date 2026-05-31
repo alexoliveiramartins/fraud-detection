@@ -5,6 +5,9 @@ services:
     platform: linux/amd64
     environment:
       - GOMAXPROCS=1
+      - API_SOCKET=/var/run/rinha/api1.sock
+    volumes:
+      - socket-dir:/var/run/rinha
     networks:
       - fraud-network
     deploy:
@@ -19,6 +22,9 @@ services:
     platform: linux/amd64
     environment:
       - GOMAXPROCS=1
+      - API_SOCKET=/var/run/rinha/api2.sock
+    volumes:
+      - socket-dir:/var/run/rinha
     networks:
       - fraud-network
     deploy:
@@ -26,7 +32,7 @@ services:
         limits:
           cpus: "0.4"
           memory: "160MB"
-          
+
   haproxy:
     image: haproxy:3.0-alpine
     hostname: haproxy
@@ -35,6 +41,7 @@ services:
       - "9999:9999"
     volumes:
       - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - socket-dir:/var/run/rinha
     depends_on:
       - api1
       - api2
@@ -49,3 +56,6 @@ services:
 networks:
   fraud-network:
     driver: bridge
+
+volumes:
+  socket-dir:
