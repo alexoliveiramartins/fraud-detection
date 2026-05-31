@@ -108,13 +108,10 @@ func evaluate(a *app.App, entries []testEntry, nprobe int) stats {
 		vec := a.MakeVector(entry.Request)
 
 		started := time.Now()
-		score, err := a.IVF.IvfSearch(vec, 5, nprobe)
+		fraudCount := a.IVF.IvfSearch(vec, 5, nprobe)
 		result.totalScoreTime += time.Since(started)
-		if err != nil {
-			log.Fatalf("ivf search: %v", err)
-		}
 
-		approved := score < 0.6
+		approved := fraudCount < 3
 		switch {
 		case entry.ExpectedApproved && approved:
 			result.tn++

@@ -14,6 +14,15 @@ const (
 	nProbe int = 12
 )
 
+var fraudResponseBodies = [6][]byte{
+	[]byte(`{"approved":true,"fraud_score":0}`),
+	[]byte(`{"approved":true,"fraud_score":0.2}`),
+	[]byte(`{"approved":true,"fraud_score":0.4}`),
+	[]byte(`{"approved":false,"fraud_score":0.6}`),
+	[]byte(`{"approved":false,"fraud_score":0.8}`),
+	[]byte(`{"approved":false,"fraud_score":1}`),
+}
+
 func (a *App) FraudScoreHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	switch r.Method {
@@ -28,22 +37,11 @@ func (a *App) FraudScoreHandler(w http.ResponseWriter, r *http.Request) {
 
 		vec := a.MakeVector(body)
 
-		ivf, err := a.IVF.IvfSearch(vec, topK, nProbe)
-		if err != nil {
-			sonic.ConfigDefault.NewEncoder(w).Encode(vs.Response{
-				Approved:   false,
-				FraudScore: 1,
-			})
-			return
-		}
+		fraudCount := a.IVF.IvfSearch(vec, topK, nProbe)
 
-		resp := MakeResponse(ivf)
+		resp := fraudResponseBodies[fraudCount]
 
-		err = sonic.ConfigDefault.NewEncoder(w).Encode(resp)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+		_, _ = w.Write(resp)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}

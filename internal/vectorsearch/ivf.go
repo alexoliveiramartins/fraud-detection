@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"sort"
 )
 
 // const Float32ReferenceSize = 57
@@ -83,6 +84,15 @@ func (ivf *IVF) Build(items []Reference, nCentroids int) {
 	for _, item := range items {
 		centroid := ivf.ClosestCentroid(item.Vector)
 		ivf.Lists[centroid] = append(ivf.Lists[centroid], item)
+	}
+
+	for clusterID := range ivf.Lists {
+		centroid := ivf.Centroids[clusterID]
+
+		sort.Slice(ivf.Lists[clusterID], func(i, j int) bool {
+			return Dist(ivf.Lists[clusterID][i].Vector, centroid) <
+				Dist(ivf.Lists[clusterID][j].Vector, centroid)
+		})
 	}
 }
 
@@ -263,7 +273,7 @@ func (ivf *IVFFile) ClosestCentroid(query Vector) int {
 }
 
 // hot path da aplicacao
-func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) (float32, error) {
+func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) (int) {
 	queryQ := QuantizeVector(query)
 	var top fixedTop
 
@@ -283,21 +293,7 @@ func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) (float32, error) 
 		fraudCount = top.fraudCount()
 	}
 
-	// evita fazer calculo da divisao ja que topK = 5 sempre na rinha (micro-otimizacao)
-	switch fraudCount {
-	case 0:
-		return 0, nil
-	case 1:
-		return 0.2, nil
-	case 2:
-		return 0.4, nil
-	case 3:
-		return 0.6, nil
-	case 4:
-		return 0.8, nil
-	default:
-		return 1, nil
-	}
+	return fraudCount
 }
 
 // preenche "ids" com os ids dos (nProbe) centroides mais proximos

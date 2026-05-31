@@ -159,14 +159,15 @@ func benchmarkScoresForNProbe(b *testing.B, a *App, vectors []vs.Vector, nProbe 
 
 	scores := make([]float32, len(vectors))
 	for i, vec := range vectors {
-		score, err := a.IVF.IvfSearch(vec, topK, nProbe)
-		if err != nil {
-			b.Fatalf("search nprobe=%d: %v", nProbe, err)
-		}
-		scores[i] = score
+		fraudCount := a.IVF.IvfSearch(vec, topK, nProbe)
+		scores[i] = benchmarkScoreFromCount(fraudCount)
 	}
 
 	return scores
+}
+
+func benchmarkScoreFromCount(fraudCount int) float32 {
+	return float32(fraudCount) / float32(topK)
 }
 
 func benchmarkApproval(score float32) bool {
@@ -266,11 +267,8 @@ func benchmarkSelectiveTriggerCount(b *testing.B, a *App, vectors []vs.Vector) i
 
 	triggered := 0
 	for _, vec := range vectors {
-		score, err := a.IVF.IvfSearch(vec, topK, 1)
-		if err != nil {
-			b.Fatalf("search nprobe=1: %v", err)
-		}
-		if score == 0.4 || score == 0.6 {
+		fraudCount := a.IVF.IvfSearch(vec, topK, 1)
+		if fraudCount == 2 || fraudCount == 3 {
 			triggered++
 		}
 	}
@@ -507,11 +505,8 @@ func BenchmarkIVFSearchMixedClusters(b *testing.B) {
 	b.ReportMetric(benchmarkAvgRefsScanned(b, a.IVF, queries, 1), "refs/op")
 
 	for i := 0; i < b.N; i++ {
-		score, err := a.IVF.IvfSearch(queries[i%len(queries)], 5, 1)
-		if err != nil {
-			b.Fatal(err)
-		}
-		benchmarkScore = score
+		fraudCount := a.IVF.IvfSearch(queries[i%len(queries)], 5, 1)
+		benchmarkScore = benchmarkScoreFromCount(fraudCount)
 	}
 }
 
@@ -525,11 +520,8 @@ func BenchmarkIVFSearchSmallestCluster(b *testing.B) {
 	reportSearchMetrics(b, a.IVF, query, 1)
 
 	for i := 0; i < b.N; i++ {
-		score, err := a.IVF.IvfSearch(query, 5, 1)
-		if err != nil {
-			b.Fatal(err)
-		}
-		benchmarkScore = score
+		fraudCount := a.IVF.IvfSearch(query, 5, 1)
+		benchmarkScore = benchmarkScoreFromCount(fraudCount)
 	}
 }
 
@@ -543,11 +535,8 @@ func BenchmarkIVFSearchLargestCluster(b *testing.B) {
 	reportSearchMetrics(b, a.IVF, query, 1)
 
 	for i := 0; i < b.N; i++ {
-		score, err := a.IVF.IvfSearch(query, 5, 1)
-		if err != nil {
-			b.Fatal(err)
-		}
-		benchmarkScore = score
+		fraudCount := a.IVF.IvfSearch(query, 5, 1)
+		benchmarkScore = benchmarkScoreFromCount(fraudCount)
 	}
 }
 
@@ -564,12 +553,8 @@ func BenchmarkFraudSearch(b *testing.B) {
 			reportSearchMetrics(b, a.IVF, vec, 1)
 
 			for i := 0; i < b.N; i++ {
-				score, err := a.IVF.IvfSearch(vec, topK, 1)
-				if err != nil {
-					b.Fatal(err)
-				}
-
-				benchmarkScore = score
+				fraudCount := a.IVF.IvfSearch(vec, topK, 1)
+				benchmarkScore = benchmarkScoreFromCount(fraudCount)
 			}
 		})
 	}
@@ -588,12 +573,8 @@ func BenchmarkFraudSearchSelectiveNProbe3(b *testing.B) {
 			reportSearchMetrics(b, a.IVF, vec, 3)
 
 			for i := 0; i < b.N; i++ {
-				score, err := a.IVF.IvfSearch(vec, topK, 3)
-				if err != nil {
-					b.Fatal(err)
-				}
-
-				benchmarkScore = score
+				fraudCount := a.IVF.IvfSearch(vec, topK, 3)
+				benchmarkScore = benchmarkScoreFromCount(fraudCount)
 			}
 		})
 	}
@@ -610,11 +591,8 @@ func BenchmarkFraudSearchTestDataNProbe1(b *testing.B) {
 	reportSelectiveTriggerMetrics(b, vectors, triggered)
 
 	for i := 0; i < b.N; i++ {
-		score, err := a.IVF.IvfSearch(vectors[i%len(vectors)], topK, 1)
-		if err != nil {
-			b.Fatal(err)
-		}
-		benchmarkScore = score
+		fraudCount := a.IVF.IvfSearch(vectors[i%len(vectors)], topK, 1)
+		benchmarkScore = benchmarkScoreFromCount(fraudCount)
 	}
 }
 
@@ -629,11 +607,8 @@ func BenchmarkFraudSearchTestDataSelectiveNProbe3(b *testing.B) {
 	reportSelectiveTriggerMetrics(b, vectors, triggered)
 
 	for i := 0; i < b.N; i++ {
-		score, err := a.IVF.IvfSearch(vectors[i%len(vectors)], topK, 3)
-		if err != nil {
-			b.Fatal(err)
-		}
-		benchmarkScore = score
+		fraudCount := a.IVF.IvfSearch(vectors[i%len(vectors)], topK, 3)
+		benchmarkScore = benchmarkScoreFromCount(fraudCount)
 	}
 }
 
@@ -654,11 +629,8 @@ func BenchmarkNProbeDetectionComparison(b *testing.B) {
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {
-				score, err := a.IVF.IvfSearch(data.vectors[i%len(data.vectors)], topK, nProbe)
-				if err != nil {
-					b.Fatal(err)
-				}
-				benchmarkScore = score
+				fraudCount := a.IVF.IvfSearch(data.vectors[i%len(data.vectors)], topK, nProbe)
+				benchmarkScore = benchmarkScoreFromCount(fraudCount)
 			}
 			b.StopTimer()
 
@@ -683,12 +655,9 @@ func BenchmarkFraudPipeline(b *testing.B) {
 
 			for i := 0; i < b.N; i++ {
 				vec := a.MakeVector(payload.body)
-				score, err := a.IVF.IvfSearch(vec, topK, 1)
-				if err != nil {
-					b.Fatal(err)
-				}
+				fraudCount := a.IVF.IvfSearch(vec, topK, 1)
 
-				benchmarkResponse = MakeResponse(score)
+				benchmarkResponse = MakeResponse(benchmarkScoreFromCount(fraudCount))
 			}
 		})
 	}

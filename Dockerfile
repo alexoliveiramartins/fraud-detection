@@ -13,7 +13,7 @@ RUN go run ./tools/preprocess.go
 COPY cmd ./cmd
 COPY internal/app ./internal/app
 
-RUN GOMAXPROCS=1 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o fraud-detection ./cmd/api
+RUN GOAMD64=v3 GOMAXPROCS=1 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o fraud-detection ./cmd/api
 
 FROM scratch
 

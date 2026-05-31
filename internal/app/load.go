@@ -29,7 +29,7 @@ func (a *App) Warmup() {
 	const step = 4
 
 	for i := 0; i < len(a.IVF.Centroids); i += step {
-		_, _ = a.IVF.IvfSearch(a.IVF.Centroids[i], topK, nProbe)
+		_ = a.IVF.IvfSearch(a.IVF.Centroids[i], topK, nProbe)
 	}
 }
 
