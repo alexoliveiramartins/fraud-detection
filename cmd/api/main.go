@@ -39,7 +39,7 @@ func main() {
 		panic(err)
 	}
 
-	app.Warmup()
+	// app.Warmup()
 
 	http.HandleFunc("/ready", app.ReadyHandler)
 	http.HandleFunc("/fraud-score", app.FraudScoreHandler)
