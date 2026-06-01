@@ -15,7 +15,7 @@ const (
 	MaxNProbe          = 64
 )
 
-var nProbeScaling = [6]int{12, 12, 32, 64, 12, 12}
+var nProbeScaling = [6]int{12, 64, 64, 64, 64, 12}
 
 type QuantizedVector [14]int16
 
