@@ -12,10 +12,10 @@ const (
 	Int16ReferenceSize = 29
 	fixedTopK          = 5
 	QuantScale         = 10000
-	MaxNProbe          = 64
+	MaxNProbe          = 128
 )
 
-var nProbeScaling = [6]int{12, 64, 64, 64, 64, 12}
+var nProbeScaling = [6]int{12, 12, 69, 57, 71, 125}
 
 type QuantizedVector [14]int16
 
