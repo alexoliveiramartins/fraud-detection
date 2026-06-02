@@ -1,6 +1,6 @@
 services:
   api1:
-    image: ghcr.io/alexoliveiramartins/fraud-detection:d02f70d7f76262349b2b88931dd15d70bad90533
+    image: ghcr.io/alexoliveiramartins/fraud-detection:82e8460b48575b55ce821969488c3f448dc501ad
     hostname: api1
     platform: linux/amd64
     environment:
@@ -17,7 +17,7 @@ services:
           memory: "160MB"
 
   api2:
-    image: ghcr.io/alexoliveiramartins/fraud-detection:d02f70d7f76262349b2b88931dd15d70bad90533
+    image: ghcr.io/alexoliveiramartins/fraud-detection:82e8460b48575b55ce821969488c3f448dc501ad
     hostname: api2
     platform: linux/amd64
     environment:
