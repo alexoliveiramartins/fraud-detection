@@ -32,12 +32,10 @@ go.work.sum
 # .vscode/
 
 docs/*
-!docs/SCORES.md
 resources/references.bin
 test/*
 *.bin
-Makefile
+# Makefile
 bench.sh
 out.txt
-backup
 per_class_calibration_test.go

@@ -44,24 +44,30 @@ The Docker Compose setup stays within the challenge limit of `1 CPU` and `350MB`
 
 |   Service |   CPU |    Memory |
 | --------: | ----: | --------: |
-|      api1 |   0.4 |     160Mb |
-|      api2 |   0.4 |     160Mb |
-|   haproxy |   0.2 |      30Mb |
+|      api1 | 0.425 |     160Mb |
+|      api2 | 0.425 |     160Mb |
+|   haproxy |  0.15 |      30Mb |
 | **Total** | **1** | **350Mb** |
 
 ## Optimizations
 
 - Use of IVF search instead of brute-force and HSNW for better memory usage / performance with the avaliable resources of the challenge
+- `nCentroids` = 4096 for best precision x performance balance
+- **BBox pruning** for skipping clusters which won't improve topK anyways
+- Zero alloc on most functions by using arrays with fixed size instead of slices and avoiding `sort.Slice`
+- Heap-like TopK to avoid sorting all vectors on a cluster
+- Adaptative nProbe to treat each fraudCount case and trying to reduce false positives/false negatives
 - Pre-processing of the reference vectors to binary (.bin) file
 - In-memory loading of the vectors/IVF indexes from the .bin files with `mmap` to avoid heap pressuring
+- Warmup `mmap` before opening connections
 - Vector dimensions Quantization from `float32` to `int16` for a smaller vectors binary while keeping precision
 - `sonic/encoding` for json incoding instead of `encoding/json` for faster serializing & deserializing
-- `nProbe` = 12 / `nCentroids` = 1024 for best precision x performance balance
-- Heap-like TopK to avoid sorting all vectors on a cluster
 - Unroll the loop of the distance function for better performance
 - Trade nginx for Haproxy to handle more requests/sec
-- Use tcp on Haproxy configuration for lower overhead than http mode
-- Adaptative nProbe to treat edge cases
+- Use tcp mode + Unix domain sockets for communication on Haproxy config for lower overhead than http mode
+- Precomputed json responses to avoid using sonic.Encode or other encode in the response
+- Inlining + Bounds checking for compiler optimization
+- `GOAMD64=v3` flag to increase chances of possible SIMD usage by the compiler
 
 ## Pre-requisites
 
@@ -133,6 +139,35 @@ Example:
   "approved": true,
   "fraud_score": 0
 }
+```
+
+## Running k6 tests
+
+```bash
+docker compose up --build
+k6 run tests/v3/smoke.js  # smoke test
+k6 run tests/v3/test.js   # actual test
+```
+
+> The results will be avaliable after completion on `test/results.json`
+
+## Benchmarks and Calibration
+
+Useful local commands:
+
+```bash
+make bench-once   # run the Go benchmarks once
+make bench        # run the Go benchmarks multiple times
+make eval         # evaluate FP/FN and detection score offline
+make calibrate    # find the per-class nProbeScaling values
+```
+
+The benchmarks measure the main request path: JSON decode, vector creation, closest centroid search, IVF search, full pipeline, handler overhead, precomputed response, and index shape.
+
+The calibration command searches for the smallest per-class `nProbeScaling` values using the local test dataset. The current calibrated value is:
+
+```go
+var nProbeScaling = [6]int{12, 12, 82, 189, 70, 12}
 ```
 
 ## Docker Image

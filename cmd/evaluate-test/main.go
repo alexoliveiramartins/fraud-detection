@@ -81,6 +81,9 @@ func loadApp() *app.App {
 	if err := a.LoadOffsets(); err != nil {
 		log.Fatalf("load offsets: %v", err)
 	}
+	if err := a.LoadBBoxes(); err != nil {
+		log.Fatalf("load bboxes: %v", err)
+	}
 	return a
 }
 
