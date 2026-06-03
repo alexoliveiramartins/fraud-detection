@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"runtime"
 	"sort"
 )
 
@@ -94,6 +95,22 @@ func (ivf *IVF) Build(items []Reference, nCentroids int) {
 				Dist(&ivf.Lists[clusterID][j].Vector, &centroid)
 		})
 	}
+}
+
+func (ivf *IVFFile) TouchVectorsPages() {
+	const pageSize = 4096
+	var acc byte
+
+	data := ivf.VectorsData
+	for i := 0; i < len(data); i += pageSize {
+		acc ^= data[i]
+	}
+
+	if len(data) > 0 {
+		acc ^= data[len(data)-1]
+	}
+
+	runtime.KeepAlive(acc)
 }
 
 func (ivf *IVF) ClosestCentroid(vec Vector) int {

@@ -87,7 +87,7 @@ func benchmarkPayloads() []benchmarkPayloadFixture {
 
 	return []benchmarkPayloadFixture{
 		{
-			name: "without_last_transaction",
+			name: "payload_last_tx_null",
 			json: []byte(`{
 				"id":"tx-bench-null-last",
 				"transaction":{"amount":41.12,"installments":2,"requested_at":"2026-03-11T18:45:53Z"},
@@ -121,7 +121,7 @@ func benchmarkPayloads() []benchmarkPayloadFixture {
 			},
 		},
 		{
-			name: "with_last_transaction",
+			name: "payload_last_tx_present",
 			json: []byte(`{
 				"id":"tx-bench-last",
 				"transaction":{"amount":384.88,"installments":3,"requested_at":"2026-03-11T20:23:35Z"},
@@ -202,7 +202,7 @@ func scoreFromFraudCount(fraudCount int) float32 {
 	return float32(fraudCount) / float32(topK)
 }
 
-func BenchmarkSonicDecode(b *testing.B) {
+func Benchmark01_JSONDecode_Sonic(b *testing.B) {
 	for _, payload := range benchmarkPayloads() {
 		b.Run(payload.name, func(b *testing.B) {
 			var reader bytes.Reader
@@ -223,7 +223,7 @@ func BenchmarkSonicDecode(b *testing.B) {
 	}
 }
 
-func BenchmarkMakeVector(b *testing.B) {
+func Benchmark02_VectorizePayload(b *testing.B) {
 	a := loadBenchmarkApp(b)
 
 	for _, payload := range benchmarkPayloads() {
@@ -239,7 +239,7 @@ func BenchmarkMakeVector(b *testing.B) {
 	}
 }
 
-func BenchmarkClosestCentroids(b *testing.B) {
+func Benchmark03_IVF_ClosestCentroids(b *testing.B) {
 	a := loadBenchmarkApp(b)
 	queries := benchmarkQueries(b, a.IVF)
 
@@ -255,7 +255,7 @@ func BenchmarkClosestCentroids(b *testing.B) {
 	}
 }
 
-func BenchmarkIVFSearchPayloads(b *testing.B) {
+func Benchmark04_IVF_Search_SyntheticPayloads(b *testing.B) {
 	a := loadBenchmarkApp(b)
 
 	for _, payload := range benchmarkPayloads() {
@@ -276,7 +276,7 @@ func BenchmarkIVFSearchPayloads(b *testing.B) {
 	}
 }
 
-func BenchmarkIVFSearchTestData(b *testing.B) {
+func Benchmark05_IVF_Search_FullTestData(b *testing.B) {
 	a := loadBenchmarkApp(b)
 	vectors := loadBenchmarkVectors(b, a, "test/v3/test-data.json")
 
@@ -292,7 +292,7 @@ func BenchmarkIVFSearchTestData(b *testing.B) {
 	}
 }
 
-func BenchmarkFraudPipeline(b *testing.B) {
+func Benchmark06_FraudPipeline_VectorizeSearchResponse(b *testing.B) {
 	a := loadBenchmarkApp(b)
 
 	for _, payload := range benchmarkPayloads() {
@@ -310,7 +310,7 @@ func BenchmarkFraudPipeline(b *testing.B) {
 	}
 }
 
-func BenchmarkFraudHandler(b *testing.B) {
+func Benchmark07_HTTPHandler_DecodeSearchWrite(b *testing.B) {
 	a := loadBenchmarkApp(b)
 
 	for _, payload := range benchmarkPayloads() {
@@ -334,7 +334,7 @@ func BenchmarkFraudHandler(b *testing.B) {
 	}
 }
 
-func BenchmarkPrecomputedResponseBody(b *testing.B) {
+func Benchmark08_PrecomputedResponseLookup(b *testing.B) {
 	body := fraudResponseBodies[2]
 
 	b.ReportAllocs()
@@ -346,7 +346,7 @@ func BenchmarkPrecomputedResponseBody(b *testing.B) {
 	}
 }
 
-func BenchmarkIndexShape(b *testing.B) {
+func Benchmark09_IndexClusterShape(b *testing.B) {
 	a := loadBenchmarkApp(b)
 
 	counts := make([]int, len(a.IVF.Offsets))
