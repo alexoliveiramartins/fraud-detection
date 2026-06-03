@@ -295,9 +295,7 @@ func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) int {
 	var top fixedTop
 
 	var centroidIDs [MaxNProbe]int
-	ivf.ClosestCentroids(&query, &centroidIDs)
-
-	// closestCentroidID := ivf.ClosestCentroid(query)
+	ivf.closestCentroidsN(&query, &centroidIDs, nProbe)
 
 	ivf.searchIntoAdditionalTop(&top, queryQ, &centroidIDs, 0, nProbe)
 
@@ -306,6 +304,7 @@ func (ivf *IVFFile) IvfSearch(query Vector, k int, nProbe int) int {
 	// busca em mais clusters dinamicamente
 	additionalClusters := nProbeScaling[fraudCount] - nProbe
 	if additionalClusters > 0 {
+		ivf.closestCentroidsN(&query, &centroidIDs, nProbeScaling[fraudCount])
 		ivf.searchIntoAdditionalTop(&top, queryQ, &centroidIDs, nProbe, nProbeScaling[fraudCount])
 		fraudCount = top.fraudCount()
 	}
@@ -318,6 +317,14 @@ func (ivf *IVFFile) ClosestCentroids(
 	query *Vector,
 	ids *[MaxNProbe]int,
 ) {
+	ivf.closestCentroidsN(query, ids, MaxNProbe)
+}
+
+func (ivf *IVFFile) closestCentroidsN(
+	query *Vector,
+	ids *[MaxNProbe]int,
+	limit int,
+) {
 	var dists [MaxNProbe]float32
 	size := 0
 	worstIdx := 0
@@ -327,7 +334,7 @@ func (ivf *IVFFile) ClosestCentroids(
 		dist := Dist(query, &ivf.Centroids[id])
 
 		// preenche os nProbe primeiros
-		if size < MaxNProbe {
+		if size < limit {
 			ids[size] = id
 			dists[size] = dist
 
@@ -352,7 +359,7 @@ func (ivf *IVFFile) ClosestCentroids(
 		// escolhe novamente a pior distancia
 		worstIdx = 0
 		worstDist = dists[0]
-		for i := 1; i < MaxNProbe; i++ {
+		for i := 1; i < limit; i++ {
 			if dists[i] > worstDist {
 				worstDist = dists[i]
 				worstIdx = i
@@ -360,7 +367,7 @@ func (ivf *IVFFile) ClosestCentroids(
 		}
 	}
 
-	for i := 1; i < MaxNProbe; i++ {
+	for i := 1; i < limit; i++ {
 		id := ids[i]
 		dist := dists[i]
 		j := i - 1
