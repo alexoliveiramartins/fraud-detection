@@ -41,9 +41,10 @@ jobs:
       - name: Update submission compose image
         working-directory: submission
         run: |
+          cp ../haproxy.cfg ./haproxy.cfg
           sed -i -E 's|ghcr\.io/alexoliveiramartins/fraud-detection:[^[:space:]]+|ghcr.io/alexoliveiramartins/fraud-detection:${{ github.sha }}|g' docker-compose.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docker-compose.yml
-          git commit -m "chore: update submission image tag" || exit 0
+          git add docker-compose.yml haproxy.cfg
+          git commit -m "chore: update submission files" || exit 0
           git push origin HEAD:submission
