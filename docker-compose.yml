@@ -3,7 +3,7 @@ services:
     build: .
     hostname: api1
     platform: linux/amd64
-        cpuset: "0"
+    cpuset: "0"
     environment:
       - GOMAXPROCS=1
       - API_SOCKET=/var/run/rinha/api1.sock
@@ -21,6 +21,7 @@ services:
     build: .
     hostname: api2
     platform: linux/amd64
+    cpuset: "1"
     environment:
       - GOMAXPROCS=1
       - API_SOCKET=/var/run/rinha/api2.sock
@@ -38,6 +39,7 @@ services:
     image: haproxy:3.0-alpine
     hostname: haproxy
     platform: linux/amd64
+    cpuset: "2,3"
     ports:
       - "9999:9999"
     volumes:

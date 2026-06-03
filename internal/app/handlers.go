@@ -1,8 +1,9 @@
 package app
 
 import (
-	"fmt"
+	"net"
 	"net/http"
+	"time"
 
 	"github.com/bytedance/sonic"
 
@@ -47,12 +48,21 @@ func (a *App) FraudScoreHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (a *App) ReadyHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	switch r.Method {
-	case http.MethodGet:
-		fmt.Fprintln(w, "Hello World")
-	default:
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+func socketReady(path string) bool {
+	conn, err := net.DialTimeout("unix", path, 10*time.Millisecond)
+	if err != nil {
+		return false
 	}
+
+	_ = conn.Close()
+	return true
+}
+
+func (a *App) ReadyHandler(w http.ResponseWriter, r *http.Request) {
+	if !socketReady("/var/run/rinha/api1.sock") || !socketReady("/var/run/rinha/api2.sock") {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
