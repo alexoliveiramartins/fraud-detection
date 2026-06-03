@@ -3,6 +3,7 @@ services:
     image: ghcr.io/alexoliveiramartins/fraud-detection:75f4f2a77a5646007922e79d58276f80e63530bd
     hostname: api1
     platform: linux/amd64
+    cpuset: "0"
     environment:
       - GOMAXPROCS=1
       - API_SOCKET=/var/run/rinha/api1.sock
@@ -20,6 +21,7 @@ services:
     image: ghcr.io/alexoliveiramartins/fraud-detection:75f4f2a77a5646007922e79d58276f80e63530bd
     hostname: api2
     platform: linux/amd64
+    cpuset: "1"
     environment:
       - GOMAXPROCS=1
       - API_SOCKET=/var/run/rinha/api2.sock
@@ -37,6 +39,7 @@ services:
     image: haproxy:3.0-alpine
     hostname: haproxy
     platform: linux/amd64
+    cpuset: "2,3"
     ports:
       - "9999:9999"
     volumes:
