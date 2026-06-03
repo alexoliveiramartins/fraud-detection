@@ -34,7 +34,7 @@ func main() {
 		panic(err)
 	}
 
-	app.IVF.TouchVectorsPages()
+	// app.IVF.TouchVectorsPages()
 
 	err = app.LoadBBoxes()
 	if err != nil {

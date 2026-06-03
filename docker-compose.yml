@@ -3,6 +3,7 @@ services:
     build: .
     hostname: api1
     platform: linux/amd64
+        cpuset: "0"
     environment:
       - GOMAXPROCS=1
       - API_SOCKET=/var/run/rinha/api1.sock
