@@ -4,6 +4,13 @@ Backend for the [Rinha de Backend 2026](https://github.com/zanfranceschi/rinha-d
 
 The service receives card transaction payloads, converts them into 14-dimensional vectors, and classifies fraud risk using an IVF-style vector search over the provided reference dataset.
 
+## Results (Final Update)
+
+- Finished at **64th place** with **5,183.26 points** **(2.6307ms p99 & 0.0111% failures)**
+- Leaderboard avaliable at https://rinhadebackend.com.br/
+
+<img width="1227" height="348" alt="Screenshot_1" src="https://github.com/user-attachments/assets/17951dfb-b89f-48b5-896d-f2322f13ef4b" />
+
 ## Stack
 
 - Go
